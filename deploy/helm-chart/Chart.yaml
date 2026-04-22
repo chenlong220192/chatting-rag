@@ -1,0 +1,15 @@
+apiVersion: v2
+name: springboot-template-chart
+description: Spring Boot Helm chart for Kubernetes
+home: xxx
+type: application
+sources:
+  - xxx
+version: 2026.04.22
+appVersion: 2026.04.22
+keywords:
+- java
+- spring-boot
+maintainers:
+- name: mingsha
+  email: mingsha@example.com

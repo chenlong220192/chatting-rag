@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+  {{- if .Values.service.labels }}
+    {{- toYaml .Values.service.labels | nindent 4 }}
+  {{- end }}
+    {{- include "spring-boot.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+{{- if .Values.service.ports }}
+{{ toYaml .Values.service.ports | indent 4 }}
+{{- end }}
+  selector:
+    {{- include "spring-boot.selectorLabels" . | nindent 4 }}

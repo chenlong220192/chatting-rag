@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: chatting-rag
+  profiles:
+    active:
+      - embedding
+      - llm
+      - chroma
+      - upload
+      - rag
+      - prompt
+      - context
+      - tomcat
+      - monitor
+      - logging

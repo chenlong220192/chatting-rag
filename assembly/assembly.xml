@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<assembly>
+
+    <!-- 可自定义，这里指定的是项目环境 -->
+    <!-- 例：chatting-rag-dev-0.0.1-SNAPSHIT.tar.gz  -->
+    <id>${profileActive}-${project.version}</id>
+
+    <!-- 打包的类型，如果有N个，将会打N个类型的包 -->
+    <formats>
+        <format>tar.gz</format>
+        <!-- <format>zip</format> -->
+    </formats>
+
+    <!-- 指定打的包是否包含打包层目录（比如finalName是chatting-rag，当值为true，所有文件被放在包内的chatting-rag目录下，否则直接放在包的根目录下）-->
+    <includeBaseDirectory>true</includeBaseDirectory>
+
+    <!-- 制定打包模块 -->
+    <moduleSets>
+
+        <moduleSet>
+            <useAllReactorProjects>true</useAllReactorProjects>
+            <excludes>
+              <exclude>${project.groupId}:*test</exclude>
+              <exclude>${project.groupId}:*boot</exclude>
+              <exclude>${project.groupId}:*assembly</exclude>
+            </excludes>
+            <binaries>
+                <outputDirectory>lib</outputDirectory>
+                <unpack>false</unpack>
+            </binaries>
+        </moduleSet>
+
+    </moduleSets>
+
+    <!-- 指定要包含的文件集 可以定义多个fileSet -->
+    <fileSets>
+        <!--
+            0755->即用户具有读/写/执行权限，组用户和其它用户具有读写权限；
+            0644->即用户具有读写权限，组用户和其它用户具有只读权限；
+        -->
+        <!-- 将启动、关闭、重启等脚本输出到deploy目录中 -->
+        <fileSet>
+            <directory>${basedir}/../deploy/deploy</directory> <!-- 指定归档文件（要打的jar包）要包含的目录（下的文件及文件夹） -->
+            <outputDirectory>bin</outputDirectory> <!-- 指定要将当前目录（<directory>标签中的目录放在归档文件（要打的jar包）config目录下） -->
+            <fileMode>0755</fileMode> <!-- 设置文件 UNIX 属性，是一种读写权限 -->
+            <includes>
+                <include>**.sh</include> <!-- 精确控制要包含的文件，<exclude>用于精确控制要排除的文件  -->
+                <include>**.bat</include>
+            </includes>
+        </fileSet>
+
+        <!-- 包含部署文档目录下的文件 -->
+        <fileSet>
+            <directory>${basedir}/../</directory>
+            <outputDirectory>./</outputDirectory>
+            <includes>
+                <include>NOTICE</include>
+                <include>*.md</include>
+                <include>docs/*</include>
+                <include>docs/img/*</include>
+            </includes>
+        </fileSet>
+
+        <!-- 指定输出配置文件到config目录中 -->
+        <fileSet>
+            <directory>${basedir}/../config/${profileActive}</directory>
+            <outputDirectory>conf</outputDirectory>
+            <fileMode>0644</fileMode>
+            <includes>
+                <include>*.yml</include>
+                <include>*.xml</include>
+                <include>*.txt</include>
+                <include>*.properties</include>
+                <include>jvm.options</include>
+            </includes>
+        </fileSet>
+
+        <!-- 将依赖打包到lib目录中 -->
+        <fileSet>
+            <directory>${basedir}/../boot/target/lib</directory>
+            <outputDirectory>lib</outputDirectory>
+            <fileMode>0755</fileMode>
+        </fileSet>
+
+        <!-- 将项目启动jar打包到boot目录中 -->
+        <fileSet>
+            <directory>${basedir}/../boot/target</directory>
+            <outputDirectory>boot</outputDirectory>
+            <fileMode>0755</fileMode>
+            <includes>
+                <include>*.jar</include>
+            </includes>
+        </fileSet>
+
+        <!-- 将手工导入的jar打包到lib目录中 -->
+        <fileSet>
+            <directory>${basedir}/../lib</directory>
+            <outputDirectory>lib</outputDirectory>
+            <includes>
+                <include>*.jar</include>
+            </includes>
+        </fileSet>
+
+        <!-- 将sql打包到目录中 -->
+        <fileSet>
+            <directory>${basedir}/../sql</directory>
+            <outputDirectory>sql</outputDirectory>
+            <includes>
+                <include>*.sql</include>
+            </includes>
+        </fileSet>
+
+    </fileSets>
+
+</assembly>

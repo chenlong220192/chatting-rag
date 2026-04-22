@@ -1,0 +1,14 @@
+apiVersion: v2
+name: nginx-template-chart
+description: nginx Helm chart for Kubernetes
+home: xxx
+type: application
+sources:
+  - xxx
+version: 2026.04.10
+appVersion: 2026.04.10
+keywords:
+- nginx
+maintainers:
+- name: mingsha
+  email: mingsha@example.com

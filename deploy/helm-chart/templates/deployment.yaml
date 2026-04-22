@@ -1,0 +1,124 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "spring-boot.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      {{- include "spring-boot.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "spring-boot.selectorLabels" . | nindent 8 }}
+      {{- if .Values.podAnnotations }}
+      annotations:
+        {{- toYaml .Values.podAnnotations | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- if .Values.restartPolicy }}
+      restartPolicy: {{ .Values.restartPolicy }}
+      {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.serviceAccountName }}
+      serviceAccountName: {{ .Values.serviceAccountName }}
+      {{- end }}
+      {{- if .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- end }}
+      initContainers:
+        {{- if .Values.initContainer.enabled }}
+        - name: check-pods
+          image: {{ .Values.initContainer.image }}
+          command:
+            - sh
+            - -c
+            - |
+              {{- range $target := .Values.initContainer.targetPods }}
+              {{- if $target.serviceName }}
+              # 检测 Service 型目标
+              {{- $ns := default $.Release.Namespace $target.namespace }}
+              {{- $dns := printf "%s.%s.svc.cluster.local" $target.serviceName $ns }}
+              until nc -z {{ $dns }} {{ $target.port }}; do
+                echo "等待服务 {{ $target.serviceName }}:{{ $target.port }} 就绪..."
+                sleep 5
+              done
+              {{- else if $target.podDomain }}
+              # 检测直接指定的 Pod
+              until nc -z {{ $target.podDomain }} {{ $target.port }}; do
+                echo "等待 Pod {{ $target.podName }}:{{ $target.port }} 就绪..."
+                sleep 5
+              done
+              {{- end }}
+              {{- end }}
+          resources:
+            limits:
+              cpu: 100m
+              memory: 64Mi
+        {{- end }}
+      containers:
+        - name: {{ .Release.Name }}
+          {{- if .Values.securityContext }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- end }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: KUBERNETES_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          {{- if .Values.env }}
+            {{- toYaml .Values.env | nindent 12 }}
+          {{- end }}
+          ports:
+          {{- if .Values.ports }}
+            {{- toYaml .Values.ports | nindent 12 }}
+          {{- end }}
+          {{- if .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          {{- end }}
+          {{- if .Values.resources }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- end }}
+          {{- if .Values.persistence.enabled }}
+          {{- if .Values.persistence.volumeMounts }}
+          volumeMounts:
+            {{- toYaml .Values.persistence.volumeMounts | nindent 12 }}
+          {{- end }}
+          {{- end }}
+      {{- if .Values.persistence.enabled }}
+      {{- if .Values.persistence.volumes }}
+      volumes:
+        {{- toYaml .Values.persistence.volumes | nindent 8 }}
+      {{- end }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

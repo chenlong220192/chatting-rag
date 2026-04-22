@@ -1,0 +1,20 @@
+# 1、基础镜像
+FROM nginx:1.29.8-alpine
+
+# 2、镜像作者
+LABEL maintainer="developer chenlong220192@gmail.com"
+
+# 3、ENV
+ENV TZ=Asia/Shanghai
+
+# 4、在构建镜像时，指定镜像的工作目录。之后的命令都是基于此工作目录，不存在则自动创建。
+WORKDIR /app/
+
+# 5、复制制品内容到目标目录
+COPY ./deploy/config/dev /etc/nginx/conf.d
+
+# 6、复制制品
+COPY ./dist /app
+
+# 7、容器启动后执行命令
+ENTRYPOINT [ "nginx", "-g", "daemon off;" ]

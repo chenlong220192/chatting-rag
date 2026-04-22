@@ -1,0 +1,14 @@
+# ============================================================
+# Embedding 配置
+# Embedding 负责将文本转换为向量，用于向量化文档片段和用户问题。
+#
+# provider: Embedding 提供商，用于代码中判断调用路径
+#   - ollama: 本地 Ollama 服务，调用 /api/embeddings 接口
+#   - openai: OpenAI Embedding，调用 /v1/embeddings 接口
+# base-url: Embedding 服务的 HTTP 地址（K8s Ingress 或本地服务地址）
+# model: 使用的 Embedding 模型名称，Ollama 中通过 `ollama list` 查看可用模型
+# ============================================================
+embedding:
+  provider: ollama
+  base-url: http://ollama.internal.local
+  model: nomic-embed-text-v2-moe

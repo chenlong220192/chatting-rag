@@ -1,0 +1,29 @@
+# ============================================================
+# 日志配置（学习用详细日志）
+# 级别说明：TRACE < DEBUG < INFO < WARN < ERROR
+#   - TRACE: 最详细，包含方法入参、返回值、循环变量等
+#   - DEBUG: 开发调试信息，如请求路径、响应状态
+#   - INFO : 重要业务流程节点（初始化、请求开始/结束）
+#   - WARN : 警告（不影响流程但需要注意）
+#   - ERROR: 错误（异常堆栈）
+# ============================================================
+logging:
+  level:
+    root: INFO
+    # 项目代码全部开启 DEBUG，学习时可以看到完整调用链
+    site.mingsha.chatting.rag: DEBUG
+    # 网络层降为 WARN，避免刷屏
+    org.springframework.web.reactive: WARN
+    org.springframework.http: WARN
+    reactor.netty: WARN
+    # Spring 核心框架降为 INFO
+    org.springframework: INFO
+  pattern:
+    # 控制台：彩色简洁格式，便于阅读
+    console: "%clr(%d{HH:mm:ss.SSS}){faint} %clr([%5level]){magenta} %clr(--){faint} %cyan(%logger{20}){cyan} %clr(:){faint} %msg%n"
+    # 文件：完整时间戳 + 调用位置，方便回溯
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} %5level [%thread] %logger{50} %msg%n"
+  file:
+    name: logs/chatting-rag.log
+    max-size: 10MB
+    max-history: 7
