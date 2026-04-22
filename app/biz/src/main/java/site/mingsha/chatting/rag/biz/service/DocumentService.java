@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -36,7 +37,22 @@ import java.util.UUID;
 @Service
 public class DocumentService {
 
-    private final EmbeddingClient embeddingClient;
+    private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
+            ".txt", ".pdf", ".doc", ".docx", ".md", ".csv", ".html", ".json", ".xml"
+    );
+    private static final Set<String> ALLOWED_MIME_TYPES = Set.of(
+            "text/plain",
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "text/markdown",
+            "text/csv",
+            "text/html",
+            "application/json",
+            "application/xml",
+            "text/xml"
+    );
     private final ChromaClient chromaClient;
     private final Path uploadDir;
     private final ObjectMapper objectMapper;
@@ -83,14 +99,45 @@ public class DocumentService {
      * @throws IOException if file I/O operations fail
      */
     public DocumentResponseDTO uploadAndIndex(MultipartFile file) throws IOException {
-        String docId = UUID.randomUUID().toString();
+        // File size validation
+        if (file.getSize() > MAX_FILE_SIZE) {
+            throw new IllegalArgumentException(
+                    "File size exceeds the maximum allowed size of 10 MB: " + file.getOriginalFilename());
+        }
+
+        // File extension validation
         String filename = file.getOriginalFilename();
-        Path filePath = uploadDir.resolve(docId + "_" + filename);
+        if (filename == null || filename.isBlank()) {
+            throw new IllegalArgumentException("File name is empty or not provided.");
+        }
+        String lowerName = filename.toLowerCase(java.util.Locale.ROOT);
+        boolean hasAllowedExtension = ALLOWED_EXTENSIONS.stream()
+                .anyMatch(lowerName::endsWith);
+        if (!hasAllowedExtension) {
+            throw new IllegalArgumentException(
+                    "File type not supported. Allowed extensions: " + ALLOWED_EXTENSIONS);
+        }
+
+        // MIME type validation
+        String contentType = file.getContentType();
+        if (contentType == null || !ALLOWED_MIME_TYPES.contains(contentType)) {
+            throw new IllegalArgumentException(
+                    "MIME type not supported: " + contentType + ". Allowed types: " + ALLOWED_MIME_TYPES);
+        }
+
+        String docId = UUID.randomUUID().toString();
+        // Sanitize filename: use docId + UUID with original extension (prevents path traversal)
+        String ext = "";
+        int dotIdx = filename.lastIndexOf('.');
+        if (dotIdx > 0) {
+            ext = filename.substring(dotIdx);
+        }
+        String sanitizedFilename = docId + "_" + UUID.randomUUID().toString() + ext;
+        Path filePath = uploadDir.resolve(sanitizedFilename);
         log.info("[Document] 开始上传文件，filename={}, docId={}", filename, docId);
 
         Files.write(filePath, file.getBytes());
 
-        String contentType = file.getContentType();
         String content = Files.readString(filePath);
 
         log.debug("[Document] 文件读取完成，filename={}, 内容长度={}", filename, content.length());
@@ -126,14 +173,14 @@ public class DocumentService {
     /**
      * Deletes a document and all its associated vector entries from ChromaDB.
      *
-     * <p>Currently performs a full database wipe. Implement collection-scoped
-     * deletion for per-document removal.</p>
+     * <p>Removes only the chunks that belong to the specified document by filtering
+     * on the {@code doc_id} metadata field.</p>
      *
      * @param docId the unique document identifier
      */
     public void deleteDocument(String docId) {
         log.info("[Document] 删除文档，docId={}", docId);
-        chromaClient.deleteAll();
+        chromaClient.deleteByDocId(docId);
     }
 
     /**

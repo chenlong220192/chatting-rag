@@ -2,6 +2,9 @@ package site.mingsha.chatting.rag.integration.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.JsonProcessingException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -34,7 +37,19 @@ public class ChromaClient {
 
     private final WebClient webClient;
     private final ObjectMapper objectMapper;
-    private String collectionId;
+    /**
+     * Cached collection ID for the "documents" collection.
+     *
+     * <p>Marked {@code volatile} because it is written by {@link #getCollectionId()}
+     * (after creating or fetching the collection) and by {@link #deleteAll()} (which
+     * nulls it out), and read by multiple threads concurrently.  A plain field would
+     * suffer a race condition where one thread nulls the value while another is
+     * reading it, producing a spurious NPE.  {@code volatile} guarantees that all
+     * threads see the most recent write immediately, which is sufficient here
+     * because String assignment is atomic and no compound read-modify-write
+     * operations are performed on this field.</p>
+     */
+    private volatile String collectionId;
 
     /**
      * Constructs the ChromaDB client.
@@ -313,6 +328,47 @@ public class ChromaClient {
             log.warn("[ChromaClient] 删除 Collection 时出错: {}", e.getMessage());
         }
         this.collectionId = null;
+    }
+
+    /**
+     * Deletes all vector entries belonging to a specific document by filtering
+     * on the {@code doc_id} metadata field via ChromaDB's delete API.
+     *
+     * @param docId the unique document identifier
+     */
+    public void deleteByDocId(String docId) {
+        String colId;
+        try {
+            colId = getCollectionId();
+        } catch (Exception e) {
+            log.info("[ChromaClient] Collection 不存在，无需删除，docId={}", docId);
+            return;
+        }
+
+        ObjectNode requestBody = objectMapper.createObjectNode();
+        ObjectNode whereClause = objectMapper.createObjectNode();
+        whereClause.put("doc_id", docId);
+        requestBody.set("where", whereClause);
+
+        String reqJson;
+        try { reqJson = objectMapper.writeValueAsString(requestBody); } catch (Exception ex) { reqJson = requestBody.toString(); }
+        log.info("[ChromaClient] 删除文档，docId={}，请求体={}", docId, reqJson);
+
+        try {
+            String response = webClient.post()
+                    .uri("/api/v2/tenants/{tenant}/databases/{db}/collections/{id}/delete",
+                            TENANT, DATABASE, colId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(reqJson)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+            log.info("[ChromaClient] 文档删除成功，docId={}", docId);
+        } catch (Exception e) {
+            String body = e instanceof org.springframework.web.reactive.function.client.WebClientResponseException wcre
+                    ? wcre.getResponseBodyAsString() : "N/A";
+            log.error("[ChromaClient] 文档删除失败，docId={}: {} | responseBody={}", docId, e.getMessage(), body, e);
+        }
     }
 
     /**
