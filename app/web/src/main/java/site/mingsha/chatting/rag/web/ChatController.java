@@ -2,6 +2,7 @@ package site.mingsha.chatting.rag.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
+import org.springframework.validation.annotation.Validated;
 import lombok.extern.slf4j.Slf4j;
 import site.mingsha.chatting.rag.biz.model.dto.ChatRequestDTO;
 import site.mingsha.chatting.rag.biz.service.RAGService;

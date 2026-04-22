@@ -54,6 +54,7 @@ public class DocumentService {
             "text/xml"
     );
     private final ChromaClient chromaClient;
+    private final EmbeddingClient embeddingClient;
     private final Path uploadDir;
     private final ObjectMapper objectMapper;
     private final int chunkSize;
