@@ -13,3 +13,4 @@ spring:
       - tomcat
       - monitor
       - logging
+      - web

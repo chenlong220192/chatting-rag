@@ -1,0 +1,12 @@
+# ============================================================
+# Web Layer Configuration
+# ============================================================
+web:
+  cors:
+    # Allowed CORS origins for development.
+    # Uses origin patterns with port wildcards so any localhost/127.0.0.1
+    # port works without needing to enumerate every port.
+    # In production, replace with actual frontend domain(s).
+    allowed-origins:
+      - http://localhost:*
+      - http://127.0.0.1:*
