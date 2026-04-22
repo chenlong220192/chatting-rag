@@ -112,7 +112,7 @@ public class ChatController {
         } catch (Exception e) {
             log.error("[Chat] SSE 流异常: {}", e.getMessage(), e);
             try {
-                emitter.send(SseEmitter.event().name("error").data(e.getMessage()));
+                emitter.send(SseEmitter.event().name("error").data("An error occurred. Please try again."));
             } catch (Exception ignored) {}
             emitter.completeWithError(e);
         }
