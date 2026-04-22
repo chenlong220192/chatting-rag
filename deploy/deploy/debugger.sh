@@ -9,8 +9,6 @@
 
 # 项目名称
 APPLICATION=chatting-rag-boot
-# 项目启动jar包名称
-APPLICATION_JAR=chatting-rag-boot-2026.04.22.jar
 
 # bin目录绝对路径
 BIN_PATH=$(cd `dirname $0`; pwd)
@@ -21,6 +19,9 @@ cd ..
 # 打印项目根目录绝对路径
 # `pwd` 执行系统命令并获得结果
 BASE_PATH=`pwd`
+
+# 项目启动jar包名称（动态读取boot目录下的JAR文件）
+APPLICATION_JAR=$(ls ${BASE_PATH}/boot/*.jar 2>/dev/null | head -1 | xargs basename)
 
 # 外部配置文件绝对目录，如果是目录需要/结尾，也可以直接指定文件
 # 如果指定的是目录，spring则会读取目录中的所有配置文件
@@ -45,8 +46,8 @@ LOG_GC_PATH="${LOG_GC_DIR}/gc.%t.log"
 LOG_DUMP_DIR=${BASE_PATH}"/dump"
 
 # 当前时间
-NOW=`date +'%Y-%m-%m-%H-%M-%S'`
-NOW_PRETTY=`date +'%Y-%m-%m %H:%M:%S'`
+NOW=`date +'%Y-%m-%d-%H-%M-%S'`
+NOW_PRETTY=`date +'%Y-%m-%d %H:%M:%S'`
 
 # 启动日志
 STARTUP_LOG="\n================================================ ${NOW_PRETTY} ================================================\n"

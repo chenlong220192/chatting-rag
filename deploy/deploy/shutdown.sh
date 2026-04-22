@@ -11,8 +11,18 @@
 
 # 项目名称
 APPLICATION=chatting-rag-boot
-# 项目启动jar包名称
-APPLICATION_JAR=chatting-rag-boot-2026.04.22.jar
+
+# bin目录绝对路径
+BIN_PATH=$(cd `dirname $0`; pwd)
+# 进入bin目录
+cd `dirname $0`
+# 返回到上一级项目根目录路径
+cd ..
+# 打印项目根目录绝对路径
+BASE_PATH=`pwd`
+
+# 项目启动jar包名称（动态读取boot目录下的JAR文件）
+APPLICATION_JAR=$(ls ${BASE_PATH}/boot/*.jar 2>/dev/null | head -1 | xargs basename)
 
 PID=$(ps -eo user,pid,tty,args | grep "${APPLICATION_JAR}" | grep -v grep | awk '{ print $2 }')
 if [[ -z "$PID" ]]

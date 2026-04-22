@@ -1,6 +1,7 @@
 package site.mingsha.chatting.rag.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
 import site.mingsha.chatting.rag.biz.model.dto.ChatRequestDTO;
 import site.mingsha.chatting.rag.biz.service.RAGService;
@@ -22,6 +23,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 @Slf4j
 @RestController
+@Validated
 @RequestMapping("/api/chat")
 public class ChatController {
 
@@ -54,7 +56,7 @@ public class ChatController {
      * @return an {@link SseEmitter} for the streaming response
      */
     @RequestMapping(method = RequestMethod.POST, produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter chatStream(@RequestBody ChatRequestDTO request) {
+    public SseEmitter chatStream(@Valid @RequestBody ChatRequestDTO request) {
         log.info("[Chat] =========================================");
         log.info("[Chat] 收到聊天请求，message=[{}]", request.message());
         log.info("[Chat] =========================================");
@@ -112,7 +114,7 @@ public class ChatController {
         } catch (Exception e) {
             log.error("[Chat] SSE 流异常: {}", e.getMessage(), e);
             try {
-                emitter.send(SseEmitter.event().name("error").data(e.getMessage()));
+                emitter.send(SseEmitter.event().name("error").data("An error occurred. Please try again."));
             } catch (Exception ignored) {}
             emitter.completeWithError(e);
         }

@@ -1,12 +1,15 @@
 package site.mingsha.chatting.rag.biz.model.dto;
 
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
 /**
  * Request DTO for the chat endpoint.
  *
- * @param message   the user's text message
- * @param sessionId optional session identifier for conversation continuity
+ * @param message the user's text message
  */
 public record ChatRequestDTO(
-        String message,
-        String sessionId
+        @NotBlank(message = "message cannot be blank")
+        @Size(max = 8192, message = "message exceeds maximum length of 8192 characters")
+        String message
 ) {}
