@@ -11,8 +11,6 @@
 
 # 项目名称
 APPLICATION=chatting-rag-boot
-# 项目启动jar包名称
-APPLICATION_JAR=chatting-rag-boot-2026.04.22.jar
 
 # bin目录绝对路径
 BIN_PATH=$(cd `dirname $0`; pwd)
@@ -23,6 +21,9 @@ cd ..
 # 打印项目根目录绝对路径
 # `pwd` 执行系统命令并获得结果
 BASE_PATH=`pwd`
+
+# 项目启动jar包名称（动态读取boot目录下的JAR文件）
+APPLICATION_JAR=$(ls ${BASE_PATH}/boot/*.jar 2>/dev/null | head -1 | xargs basename)
 
 # 停服
 echo stop ${APPLICATION} Application...
