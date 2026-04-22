@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import site.mingsha.chatting.rag.biz.model.dto.DocumentResponseDTO;
 import site.mingsha.chatting.rag.biz.service.DocumentService;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -63,7 +64,8 @@ public class DocumentController {
      * @param id the unique document identifier returned during upload
      */
     @DeleteMapping("/{id}")
-    public void delete(@PathVariable String id) {
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@PathVariable("id") String id) {
         log.info("[Document] 收到删除请求，docId={}", id);
         documentService.deleteDocument(id);
     }

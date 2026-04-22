@@ -20,21 +20,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This project uses **git worktrees** for parallel development. Each feature or bugfix runs in its own isolated directory with its own branch, allowing multiple tasks to be developed simultaneously without interfering with each other.
 
+### Directory Convention
+
+All worktrees are created under `.claude/worktrees/` with sub-directories by type:
+
+```
+.claude/worktrees/
+├── feature/          → feature branches
+├── bugfix/           → bug fix branches
+├── hotfix/           → urgent production fix branches
+└── refactor/         → refactoring branches
+```
+
+> Example: `.claude/worktrees/feature/unit-tests/` for branch `feature/unit-tests`
+
 ### Core Principle
 
 > **Never develop on `main`. Always develop on a feature/bugfix branch inside a dedicated worktree.**
 
 ```
-main worktree (main)          → production code, always clean and buildable
-feature/xxx worktree          → feature development
-bugfix/yyy worktree            → bug fix development
+main worktree (main)                           → production code, always clean and buildable
+.claude/worktrees/feature/xxx (feature/xxx)    → feature development
+.claude/worktrees/bugfix/yyy (bugfix/yyy)      → bug fix development
 ```
 
 ### Branch Naming Convention
 
 | Prefix | Purpose | Example |
 |--------|---------|---------|
-| `feature/` | New feature development | `feature/rate-limiting` |
+| `feature/` | New feature development | `feature/unit-tests` |
 | `bugfix/` | Bug fix | `bugfix/document-delete` |
 | `hotfix/` | Urgent production fix | `hotfix/cors-vulnerability` |
 | `refactor/` | Code refactoring | `refactor/chroma-client` |
@@ -56,19 +70,20 @@ git pull origin main
 **Step 2 — Create a worktree for the new branch**
 
 ```bash
-# Syntax: git worktree add <path> <branch>
-git worktree add ../chatting-rag-feature-xxx -b feature/xxx
+# Syntax: git worktree add <path> -b <branch>
+# Example: feature/unit-tests → .claude/worktrees/feature/unit-tests/
+git worktree add .claude/worktrees/feature/unit-tests -b feature/unit-tests
 ```
 
 This simultaneously:
-- Creates a new directory `../chatting-rag-feature-xxx/`
-- Checks out a new branch `feature/xxx` based on `main`
+- Creates a new directory `.claude/worktrees/feature/unit-tests/`
+- Checks out a new branch `feature/unit-tests` based on `main`
 - Attaches the worktree to the main repository
 
 **Step 3 — Develop**
 
 ```bash
-cd ../chatting-rag-feature-xxx
+cd .claude/worktrees/feature/unit-tests
 
 # Backend — in the worktree directory
 make package ENV=dev
@@ -81,12 +96,12 @@ cd ui && make run
 **Step 4 — Commit and push**
 
 ```bash
-cd ../chatting-rag-feature-xxx
+cd .claude/worktrees/feature/unit-tests
 git add .
-git commit -m "feat: add rate limiting for chat endpoint"
+git commit -m "feat: add unit tests for integration and biz layers"
 
 # Push to remote to create PR
-git push -u origin feature/xxx
+git push -u origin feature/unit-tests
 ```
 
 **Step 5 — Create PR on GitHub**
@@ -101,12 +116,12 @@ git checkout main
 git pull origin main
 
 # Remove the merged worktree directory
-git worktree remove ../chatting-rag-feature-xxx
+git worktree remove .claude/worktrees/feature/unit-tests
 
 # Prune stale remote tracking branches
 git fetch --prune origin
-git branch -d feature/xxx          # delete local branch reference
-git push origin --delete feature/xxx  # delete remote branch
+git branch -d feature/unit-tests          # delete local branch reference
+git push origin --delete feature/unit-tests  # delete remote branch
 ```
 
 ---
@@ -120,12 +135,12 @@ You can have multiple worktrees simultaneously:
 git worktree list
 
 # Example output:
-# /data/repos/mingsha/chatting-rag          main      (repository)
-# /data/repos/mingsha/chatting-rag-feature-xxx  feature/xxx  ...
-# /data/repos/mingsha/chatting-rag-bugfix-yyy  bugfix/yyy  ...
+# /data/repos/mingsha/chatting-rag               main      (repository)
+# /data/repos/mingsha/chatting-rag/.claude/worktrees/feature/unit-tests  feature/unit-tests  ...
+# /data/repos/mingsha/chatting-rag/.claude/worktrees/bugfix/upload-validation  bugfix/upload-validation  ...
 
 # Switch to a different task
-cd ../chatting-rag-bugfix-yyy
+cd .claude/worktrees/bugfix/upload-validation
 # ... do work, commit, push
 ```
 
@@ -140,7 +155,7 @@ If you're developing a feature and a critical bug is reported:
 git stash
 
 # Create a hotfix worktree
-git worktree add ../chatting-rag-hotfix-urgent -b hotfix/urgent-bug
+git worktree add .claude/worktrees/hotfix/urgent-bug -b hotfix/urgent-bug
 
 # ... fix the bug, commit, push, merge ...
 
@@ -156,7 +171,7 @@ git stash pop
 If `main` has moved forward while you're developing:
 
 ```bash
-cd ../chatting-rag-feature-xxx
+cd .claude/worktrees/feature/xxx
 
 # Rebase your feature onto latest main
 git fetch origin main
