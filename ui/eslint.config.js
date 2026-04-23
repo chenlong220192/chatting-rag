@@ -3,10 +3,12 @@ import tseslint from '@typescript-eslint/eslint-plugin';
 import tsparser from '@typescript-eslint/parser';
 import react from 'eslint-plugin-react';
 import reactHooks from 'eslint-plugin-react-hooks';
+import globals from 'globals';
 import prettier from 'eslint-config-prettier';
 
 export default [
   js.configs.recommended,
+  ...tseslint.configs.recommended,
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
@@ -17,16 +19,8 @@ export default [
         ecmaFeatures: { jsx: true },
       },
       globals: {
-        AbortController: 'readonly',
-        AbortSignal: 'readonly',
-        document: 'readonly',
-        fetch: 'readonly',
-        File: 'readonly',
-        FormData: 'readonly',
-        TextDecoder: 'readonly',
-        XMLHttpRequest: 'readonly',
-        import: 'readonly',
-        module: 'readonly',
+        ...globals.browser,
+        ...globals.es2020,
       },
     },
     plugins: {
@@ -38,22 +32,15 @@ export default [
       ...react.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
       'react/react-in-jsx-scope': 'off',
+      'react/prop-types': 'off',
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       'no-unused-vars': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'warn',
     },
     settings: {
       react: { version: 'detect' },
     },
   },
   prettier,
-  {
-    ignores: ['src/api/**', 'src/App.jsx', 'src/main.jsx'],
-  },
-  {
-    files: ['**/*.{js,mjs}'],
-    rules: {
-      'no-undef': 'off',
-    },
-  },
 ];
