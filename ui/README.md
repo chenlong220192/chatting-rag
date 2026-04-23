@@ -35,6 +35,9 @@ make run
 ## 构建
 
 ```bash
+# 开发构建
+make package ENV=development
+
 # 预发布构建
 make package ENV=staging
 
@@ -43,6 +46,16 @@ make package ENV=production
 ```
 
 构建产物输出至 `dist/` 目录。
+
+## 环境变量模板
+
+参考 `.env.example` 创建各环境的配置文件。
+
+| 文件 | 说明 |
+|------|------|
+| `.env.development` | 本地开发（proxy 到 localhost:8001）|
+| `.env.staging` | 预发布（VITE_API_TARGET 留空）|
+| `.env.production` | 生产（proxy 到 k8s 后端服务）|
 
 ## API 接口
 
@@ -57,9 +70,9 @@ make package ENV=production
 
 ```bash
 # Docker
-make docker.build ENV=dev
-make docker.run ENV=dev
+make docker.build ENV=production
+make docker.run ENV=production
 
 # Kubernetes（Helm）
-make helm.upgrade ENV=dev
+make helm.upgrade ENV=production
 ```
