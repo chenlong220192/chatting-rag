@@ -15,6 +15,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import site.mingsha.chatting.rag.biz.model.dto.ChatMetaDTO;
 import site.mingsha.chatting.rag.biz.model.dto.ChatResponseDTO;
 import site.mingsha.chatting.rag.biz.service.RAGService;
+import site.mingsha.chatting.rag.biz.service.langchain4j.ChatMemoryService;
 import site.mingsha.chatting.rag.web.ChatController;
 
 import java.util.List;
@@ -38,7 +39,8 @@ class ChatControllerTests {
 
     @Mock
     private RAGService ragService;
-
+    @Mock
+    private ChatMemoryService chatMemoryService;
     @Mock
     private ObjectMapper objectMapper;
 
@@ -46,7 +48,7 @@ class ChatControllerTests {
 
     @BeforeEach
     void setUp() {
-        ChatController controller = new ChatController(ragService, objectMapper);
+        ChatController controller = new ChatController(ragService, chatMemoryService, objectMapper);
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
@@ -60,7 +62,9 @@ class ChatControllerTests {
 
         given(ragService.getReferences("hello")).willReturn(refs);
         given(ragService.buildSystemPrompt("hello")).willReturn("system prompt");
-        given(ragService.buildMeta(eq("system prompt"), eq("hello"))).willReturn(meta);
+        given(chatMemoryService.buildSystemPromptWithHistory(anyString(), eq("system prompt")))
+                .willReturn("【对话历史】\n用户：Hi\n助手：Hello\n\nsystem prompt");
+        given(ragService.buildMeta(anyString(), eq("hello"))).willReturn(meta);
         given(objectMapper.writeValueAsString(refs)).willReturn("[{\"content\":\"chunk one\"}]");
         given(objectMapper.writeValueAsString(meta)).willReturn("{\"model\":\"gpt-4o\"}");
 
@@ -86,10 +90,44 @@ class ChatControllerTests {
         assertThat(latch.await(3, TimeUnit.SECONDS)).isTrue();
         verify(ragService).getReferences("hello");
         verify(ragService).buildSystemPrompt("hello");
-        verify(ragService).buildMeta(eq("system prompt"), eq("hello"));
-        verify(ragService).chatStream(anyString(), anyString(), any(), any());
+        verify(chatMemoryService).addUserMessage("default-session", "hello");
         verify(objectMapper).writeValueAsString(refs);
         verify(objectMapper).writeValueAsString(meta);
+    }
+
+    @Test
+    void chatStream_withConversationId_usesProvidedConversationId() throws Exception {
+        given(ragService.getReferences("hello")).willReturn(List.of());
+        given(ragService.buildSystemPrompt("hello")).willReturn("system prompt");
+        given(chatMemoryService.buildSystemPromptWithHistory("session-123", "system prompt"))
+                .willReturn("system prompt");
+        given(ragService.buildMeta(anyString(), eq("hello")))
+                .willReturn(new ChatMetaDTO("gpt-4o", 100, 4096));
+        given(objectMapper.writeValueAsString(List.of())).willReturn("[]");
+        given(objectMapper.writeValueAsString(any(ChatMetaDTO.class)))
+                .willReturn("{\"model\":\"gpt-4o\"}");
+
+        CountDownLatch latch = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Consumer<String> onChunk = invocation.getArgument(2);
+            Runnable onComplete = invocation.getArgument(3);
+            onChunk.accept("response");
+            onComplete.run();
+            latch.countDown();
+            return null;
+        }).when(ragService).chatStream(anyString(), anyString(), any(), any());
+
+        MvcResult result = mockMvc.perform(post("/api/chat")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"message\":\"hello\",\"conversationId\":\"session-123\"}"))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        result.getAsyncResult(3000);
+
+        assertThat(latch.await(3, TimeUnit.SECONDS)).isTrue();
+        verify(chatMemoryService).addUserMessage("session-123", "hello");
     }
 
     @Test
