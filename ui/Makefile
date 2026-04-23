@@ -3,7 +3,7 @@
 # example 'make init'
 # example 'make package SKIP_TEST=true ENV=dev'
 #
-# author: mingsha-vue2
+# author: chatting-rag
 # date: 2025-07-11
 #======================================================================
 
@@ -60,7 +60,7 @@ help: ## $(HELP) 显示帮助信息
 	@printf "  make <target> [ENV=environment]\n"
 	@printf "\n"
 	@printf "${BOLD}${YELLOW}%-8s:${RESET}\n" "环境变量"
-	@printf "  ${GREEN}%-22s${RESET} %s\n" "ENV" "- 环境配置 (默认: local, 可选: dev, test, prod)"
+	@printf "  ${GREEN}%-22s${RESET} %s\n" "ENV" "- 环境配置 (默认: development, 可选: development, staging, production)"
 	@printf "  ${GREEN}%-22s${RESET} %s\n" "APPNAME" "- 应用名称 (默认: mingsha-vue2)"
 	@printf "  ${GREEN}%-22s${RESET} %s\n" "VERSION" "- 版本号 (默认: 1.0.0)"
 	@printf "  ${GREEN}%-22s${RESET} %s\n" "PORT" "- 端口号 (默认: 8000)"
@@ -87,13 +87,28 @@ help: ## $(HELP) 显示帮助信息
 #
 install: ## $(INSTALL) 安装依赖
 	@printf "${BLUE}${INSTALL} 安装依赖...${RESET}\n"
-	npm install --registry=https://registry.npmmirror.com
+	npm install $(if $(NPM_REGISTRY),--registry=$(NPM_REGISTRY),)
 	@printf "${GREEN}${SUCCESS} 依赖安装完成！${RESET}\n"
 
+clean: ## $(CLEAN) 清理前端构建产物
+	@printf "${BLUE}${CLEAN} 清理前端构建产物...${RESET}\n"
+	rm -rf ${BASE_PATH}/dist
+	@printf "${GREEN}${SUCCESS} 清理完成！${RESET}\n"
+
+test: ## $(TEST) 运行前端测试
+	@printf "${BLUE}${TEST} 运行前端测试...${RESET}\n"
+	@npm run test 2>/dev/null || echo "No test script configured"
+	@printf "${GREEN}${SUCCESS} 测试完成！${RESET}\n"
+
 #
-package: ## $(PACKAGE) 构建生产包
-	@printf "${BLUE}${PACKAGE} 构建生产包 (环境: ${ENV})...${RESET}\n"
-	npm run build:prod
+package: ## $(PACKAGE) 构建前端包
+	@printf "${BLUE}${PACKAGE} 构建前端包 (环境: ${ENV})...${RESET}\n"
+	@case "${ENV}" in \
+		development) npm run build ;; \
+		staging)    npm run build:staging ;; \
+		production) npm run build:prod ;; \
+		*)          echo "Error: Unknown ENV '${ENV}'. Use: development, staging, production" && exit 1 ;; \
+	esac
 	@printf "${GREEN}${SUCCESS} 构建完成！${RESET}\n"
 
 #
