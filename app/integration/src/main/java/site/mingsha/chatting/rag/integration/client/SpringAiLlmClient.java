@@ -11,7 +11,7 @@ import reactor.core.publisher.Flux;
 import java.util.function.Consumer;
 
 /**
- * Spring AI-based LLM client wrapping the OpenAI-compatible API (MiniMax).
+ * Spring AI-based LLM client wrapping OpenAI-compatible or Anthropic API.
  *
  * <p>Replaces {@link LlmClient} which uses manual WebClient SSE parsing.
  * This implementation uses Spring AI's {@link ChatClient} for both streaming

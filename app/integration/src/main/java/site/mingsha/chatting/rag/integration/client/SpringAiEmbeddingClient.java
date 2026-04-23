@@ -5,7 +5,7 @@ import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.stereotype.Component;
 
 /**
- * Spring AI-based Embedding client using Ollama.
+ * Spring AI-based Embedding client.
  *
  * <p>Replaces {@link EmbeddingClient} which uses manual WebClient.
  * The return type ({@code float[]}) is kept the same to avoid
@@ -20,7 +20,7 @@ public class SpringAiEmbeddingClient {
     /**
      * Constructs the Spring AI embedding client.
      *
-     * @param embeddingModel the Spring AI embedding model (Ollama-backed)
+     * @param embeddingModel the Spring AI embedding model
      */
     public SpringAiEmbeddingClient(EmbeddingModel embeddingModel) {
         this.embeddingModel = embeddingModel;

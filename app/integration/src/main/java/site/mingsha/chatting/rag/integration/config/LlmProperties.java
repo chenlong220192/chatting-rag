@@ -23,7 +23,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties(prefix = "llm")
 public record LlmProperties(
-        /** LLM provider identifier (e.g., openai, ollama, claude). */
+        /** LLM provider identifier (openai-compatible or anthropic). */
         String provider,
         /** HTTP base URL of the LLM API endpoint. */
         String baseUrl,

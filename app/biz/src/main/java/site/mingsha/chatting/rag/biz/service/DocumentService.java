@@ -245,6 +245,9 @@ public class DocumentService {
      * @return a list of text chunks
      */
     private List<String> chunkText(String text) {
+        if (text == null || text.isBlank()) {
+            return List.of();
+        }
         Document document = Document.from(text);
         DocumentSplitter splitter = DocumentSplitters.recursive(chunkSize, chunkOverlap);
         List<TextSegment> segments = splitter.split(document);

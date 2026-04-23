@@ -42,16 +42,28 @@
             <artifactId>jackson-databind</artifactId>
         </dependency>
 
-        <!-- Spring AI MiniMax (supports MiniMax OpenAI-compatible API) -->
+        <!-- Spring AI OpenAI-compatible (covers SiliconFlow, DeepSeek, and similar APIs) -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-minimax-spring-boot-starter</artifactId>
+            <artifactId>spring-ai-openai</artifactId>
         </dependency>
 
-        <!-- Spring AI Ollama (for Embedding) -->
+        <!-- Spring AI Anthropic (Claude models) -->
         <dependency>
             <groupId>org.springframework.ai</groupId>
-            <artifactId>spring-ai-ollama-spring-boot-starter</artifactId>
+            <artifactId>spring-ai-anthropic</artifactId>
+        </dependency>
+
+        <!-- Spring AI Ollama (embedding — local, not swappable via config) -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-ollama</artifactId>
+        </dependency>
+
+        <!-- Spring AI Chat Client (webflux-based, replaces starter auto-config) -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-client-chat</artifactId>
         </dependency>
 
     </dependencies>

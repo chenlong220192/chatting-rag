@@ -10,7 +10,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * <p>Example YAML:</p>
  * <pre>
  * embedding:
- *   provider: ollama
  *   base-url: http://localhost:11434
  *   model: nomic-embed-text
  * </pre>
@@ -21,7 +20,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public record EmbeddingProperties(
         /** Embedding provider identifier. */
         String provider,
-        /** HTTP base URL of the embedding API (e.g., Ollama server). */
+        /** HTTP base URL of the embedding API. */
         String baseUrl,
         /** Embedding model name. */
         String model

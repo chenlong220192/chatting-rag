@@ -103,12 +103,7 @@ test: ## $(TEST) 运行前端测试
 #
 package: ## $(PACKAGE) 构建前端包
 	@printf "${BLUE}${PACKAGE} 构建前端包 (环境: ${ENV})...${RESET}\n"
-	@case "${ENV}" in \
-		development) npm run build ;; \
-		staging)    npm run build:staging ;; \
-		production) npm run build:prod ;; \
-		*)          echo "Error: Unknown ENV '${ENV}'. Use: development, staging, production" && exit 1 ;; \
-	esac
+	npm run build:prod
 	@printf "${GREEN}${SUCCESS} 构建完成！${RESET}\n"
 
 #

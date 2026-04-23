@@ -65,7 +65,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         {children}
       </Content>
       <Footer style={{ textAlign: 'center', padding: '12px', color: '#999', fontSize: 12 }}>
-        chatting-rag · Powered by ChromaDB + MiniMax
+        chatting-rag · Powered by ChromaDB + Ollama
       </Footer>
     </Layout>
   );
