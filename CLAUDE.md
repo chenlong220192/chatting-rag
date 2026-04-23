@@ -233,16 +233,14 @@ ui/               → React frontend (Vite, separate from Spring)
 
 ## Configuration
 
-Application runs on **port 8001**. Sensitive values are injected via environment variables (see `.env.example`). Spring Profile YAMLs reference them as `${ENV_VAR}`:
+Application runs on **port 8001**. Profile-specific configuration files are placed under `config/<profile>/`. Sensitive LLM credentials are managed via `config/<profile>/application-llm.yml` (see Sensitive Data Policy below):
 
 | File | Purpose |
 |------|---------|
-| `.env` | LLM and Embedding credentials (NOT committed to git) |
-| `.env.example` | Template for `.env`, safe to commit |
 | `config/app.properties` | App name, port, version, Docker/Helm metadata |
 | `config/local/application.yml` | Imports all profile-specific YAMLs |
-| `config/application-llm.yml.example` | Template for `config/dev/application-llm.yml` (safe to commit) |
-| `config/dev/application-llm.yml` | LLM provider credentials (NOT committed, override via `.env`) |
+| `config/application-llm.yml.example` | Template for LLM credentials (safe to commit) |
+| `config/<profile>/application-llm.yml` | LLM provider credentials (gitignored) |
 | `config/local/application-chroma.yml` | ChromaDB service URL |
 | `config/local/application-embedding.yml` | Embedding service URL and model |
 | `config/local/application-rag.yml` | RAG params: `top-k`, `min-score`, `chunk.size`, `chunk.overlap` |
@@ -253,14 +251,12 @@ Application runs on **port 8001**. Sensitive values are injected via environment
 
 **Never commit files containing real credentials.** The following must never be pushed to git:
 
-- `.env` — contains real API keys and tokens
-- `config/dev/application-llm.yml` — contains real LLM credentials
+- `config/<profile>/application-llm.yml` — contains real LLM API keys and tokens (gitignored via `config/**/application-llm.yml`)
 
 When setting up a new environment:
 
-1. Copy `config/application-llm.yml.example` → `config/dev/application-llm.yml`
-2. Fill in real credentials
-3. Or set them via environment variables referenced in `.env`
+1. Copy `config/application-llm.yml.example` → `config/<profile>/application-llm.yml` (e.g. `config/dev/application-llm.yml`)
+2. Fill in real credentials for the target profile
 
 ---
 
