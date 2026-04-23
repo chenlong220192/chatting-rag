@@ -62,7 +62,7 @@
 - **上下文引用** — 返回检索来源片段，便于答案溯源与核实
 
 ### ⚙️ 系统管理
-- **多环境隔离** — local / dev / test / prod 多套配置，热切换
+- **多环境隔离** — local / dev 两套配置（local 用于本地开发，dev 用于 k8s 部署）
 - **敏感信息隔离** — LLM 凭证通过 `config/<profile>/application-llm.yml` 管理，不落地代码仓库
 - **容器化部署** — Docker 镜像构建、Kubernetes Helm Chart 一键部署
 
@@ -76,7 +76,7 @@
 |------|------|------|
 | **Java** | 21 | 基础运行环境 |
 | **Spring Boot** | 4.0.5 | 应用框架 |
-| **Spring AI** | 1.0.x | AI 集成框架 |
+| **spring-boot-starter-webflux** | — | 响应式 HTTP 客户端（WebClient） |
 | **ChromaDB** | latest | 向量数据库 |
 | **Maven** | 3.9+ | 构建工具 |
 | **Prometheus** | - | 指标采集 |
@@ -121,13 +121,13 @@ chatting-rag/
 │   │   └── EmbeddingClient             Embedding 向量化客户端
 │   └── test/                           单元测试
 ├── config/                             配置文件，按 profile 分目录管理
-│   ├── local/                          local 环境配置
-│   ├── dev/                            dev 环境配置
-│   └── test/                           test 环境配置
+│   ├── local/                          local 环境（本地开发）
+│   └── dev/                            dev 环境（k8s 部署）
 ├── deploy/                             部署脚本和 Helm Chart
 │   ├── bin/                            Docker / Helm 运维脚本
-│   ├── deploy/                         启动脚本（startup.sh、shutdown.sh）
-│   └── helm/                           Kubernetes Helm Chart
+│   ├── deploy/                         Java 启动脚本（startup.sh、shutdown.sh）
+│   ├── docker/                         Dockerfile
+│   └── helm-chart/                     Kubernetes Helm Chart（后端）
 ├── ui/                                 React 前端（独立构建）
 ├── pom.xml                             父 POM
 ├── Makefile                            后端构建入口
