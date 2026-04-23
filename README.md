@@ -63,7 +63,7 @@
 
 ### ⚙️ 系统管理
 - **多环境隔离** — local / dev / test / prod 多套配置，热切换
-- **敏感信息隔离** — API Key 等敏感配置通过环境变量注入，不落地代码仓库
+- **敏感信息隔离** — LLM 凭证通过 `config/<profile>/application-llm.yml` 管理，不落地代码仓库
 - **容器化部署** — Docker 镜像构建、Kubernetes Helm Chart 一键部署
 
 ---
@@ -211,16 +211,12 @@ target/app/
 
 ## ⚙️ 配置说明
 
-应用默认端口 **8001**，敏感信息通过环境变量注入，参考根目录 `.env.example`：
+应用默认端口 **8001**，敏感信息通过 profile 配置文件管理：
 
-| 变量 | 说明 |
-|------|------|
-| `LLM_PROVIDER` | LLM 提供商（openai / ollama / claude） |
-| `LLM_BASE_URL` | LLM 服务 HTTP 地址 |
-| `LLM_API_KEY` | API 密钥 |
-| `LLM_MODEL` | 聊天模型 ID |
-| `LLM_MAX_TOKENS` | 单次回复最大 token 数 |
-| `LLM_CONTEXT_LIMIT` | 模型上下文窗口上限 |
+1. 复制 `config/application-llm.yml.example` → `config/<profile>/application-llm.yml`
+2. 填入真实的 LLM 凭证（provider、base-url、api-key、model 等）
+
+> ⚠️ `config/<profile>/application-llm.yml` 已在 `.gitignore` 中，**请勿提交到 git**。
 
 后端完整配置由 Spring Profile 分组管理，详见 `config/<profile>/`。
 
