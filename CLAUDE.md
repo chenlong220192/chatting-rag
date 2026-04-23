@@ -241,10 +241,26 @@ Application runs on **port 8001**. Sensitive values are injected via environment
 | `.env.example` | Template for `.env`, safe to commit |
 | `config/app.properties` | App name, port, version, Docker/Helm metadata |
 | `config/local/application.yml` | Imports all profile-specific YAMLs |
-| `config/local/application-llm.yml` | LLM provider, base-url, api-key, model |
+| `config/application-llm.yml.example` | Template for `config/dev/application-llm.yml` (safe to commit) |
+| `config/dev/application-llm.yml` | LLM provider credentials (NOT committed, override via `.env`) |
 | `config/local/application-chroma.yml` | ChromaDB service URL |
 | `config/local/application-embedding.yml` | Embedding service URL and model |
 | `config/local/application-rag.yml` | RAG params: `top-k`, `min-score`, `chunk.size`, `chunk.overlap` |
+
+---
+
+## Sensitive Data Policy
+
+**Never commit files containing real credentials.** The following must never be pushed to git:
+
+- `.env` — contains real API keys and tokens
+- `config/dev/application-llm.yml` — contains real LLM credentials
+
+When setting up a new environment:
+
+1. Copy `config/application-llm.yml.example` → `config/dev/application-llm.yml`
+2. Fill in real credentials
+3. Or set them via environment variables referenced in `.env`
 
 ---
 
@@ -254,4 +270,3 @@ Application runs on **port 8001**. Sensitive values are injected via environment
 - **Prometheus metrics**: Micrometer + actuator enabled; metrics at `/actuator/prometheus`.
 - **Docker base image**: `mingsha/jdk:dragonwell-21-alpine-3.23`.
 - **K8s init containers**: Wait for `ollama` and `chromadb` services before starting the app.
-- **Sensitive data**: Never commit `.env` or any file containing real credentials. Use `.env.example` as the template.

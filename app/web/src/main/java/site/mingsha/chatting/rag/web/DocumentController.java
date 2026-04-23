@@ -3,12 +3,10 @@ package site.mingsha.chatting.rag.web;
 import lombok.extern.slf4j.Slf4j;
 import site.mingsha.chatting.rag.biz.model.dto.DocumentResponseDTO;
 import site.mingsha.chatting.rag.biz.service.DocumentService;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import jakarta.validation.constraints.Size;
 
 /**
  * REST controller handling document upload and management operations.
@@ -20,7 +18,6 @@ import jakarta.validation.constraints.Size;
  */
 @Slf4j
 @RestController
-@Validated
 @RequestMapping("/api/documents")
 public class DocumentController {
 
@@ -46,7 +43,7 @@ public class DocumentController {
      * @throws Exception if file reading, chunking, or indexing fails
      */
     @PostMapping
-    public DocumentResponseDTO upload(@RequestParam("file") @Size(max = 10485760) MultipartFile file) throws Exception {
+    public DocumentResponseDTO upload(@RequestParam("file") MultipartFile file) throws Exception {
         log.info("[Document] 收到上传请求，filename={}, size={}", file.getOriginalFilename(), file.getSize());
         try {
             DocumentResponseDTO resp = documentService.uploadAndIndex(file);

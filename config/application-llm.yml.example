@@ -1,0 +1,17 @@
+# ============================================================
+# LLM 配置
+# ============================================================
+# provider: LLM 提供商
+# base-url: LLM 服务的 HTTP 地址
+# api-key: API 密钥
+# model: 聊天模型 ID
+# max-tokens: 单次回复最大 token 数量
+# context-limit: 模型上下文窗口上限（单位：token）
+# ============================================================
+llm:
+  provider: ${LLM_PROVIDER}
+  base-url: ${LLM_BASE_URL}
+  api-key: ${LLM_API_KEY}
+  model: ${LLM_MODEL}
+  max-tokens: ${LLM_MAX_TOKENS}
+  context-limit: ${LLM_CONTEXT_LIMIT}

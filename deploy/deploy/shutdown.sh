@@ -22,7 +22,7 @@ cd ..
 BASE_PATH=`pwd`
 
 # 项目启动jar包名称（动态读取boot目录下的JAR文件）
-APPLICATION_JAR=$(ls ${BASE_PATH}/boot/*.jar 2>/dev/null | head -1 | xargs basename)
+APPLICATION_JAR=chatting-rag-boot-2026.04.22.jar
 
 PID=$(ps -eo user,pid,tty,args | grep "${APPLICATION_JAR}" | grep -v grep | awk '{ print $2 }')
 if [[ -z "$PID" ]]

@@ -28,7 +28,7 @@ cd ..
 BASE_PATH=`pwd`
 
 # 项目启动jar包名称（动态读取boot目录下的JAR文件）
-APPLICATION_JAR=$(ls ${BASE_PATH}/boot/*.jar 2>/dev/null | head -1 | xargs basename)
+APPLICATION_JAR=chatting-rag-boot-2026.04.22.jar
 
 # 外部配置文件绝对目录，如果是目录需要/结尾，也可以直接指定文件
 # 如果指定的是目录，spring则会读取目录中的所有配置文件
