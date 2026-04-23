@@ -159,6 +159,7 @@ class DocumentServiceTests {
         var method = DocumentService.class.getDeclaredMethod("chunkText", String.class);
         method.setAccessible(true);
 
+        @SuppressWarnings("unchecked")
         List<String> chunks = (List<String>) method.invoke(documentService, "");
 
         assertThat(chunks).isEmpty();
@@ -170,6 +171,7 @@ class DocumentServiceTests {
         method.setAccessible(true);
 
         String shortText = "This is a short text.";
+        @SuppressWarnings("unchecked")
         List<String> chunks = (List<String>) method.invoke(documentService, shortText);
 
         assertThat(chunks).hasSize(1);
@@ -177,31 +179,36 @@ class DocumentServiceTests {
     }
 
     @Test
-    void chunkText_longText_returnsNonTrivialOutput() throws Exception {
+    void chunkText_longText_usesRecursiveSplitter() throws Exception {
         var method = DocumentService.class.getDeclaredMethod("chunkText", String.class);
         method.setAccessible(true);
 
+        // Build text that clearly exceeds chunkSize (512 chars)
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < 15; i++) {
+        for (int i = 0; i < 20; i++) {
             sb.append("Sentence ").append(i).append(" content here.\n");
         }
+        @SuppressWarnings("unchecked")
         List<String> chunks = (List<String>) method.invoke(documentService, sb.toString());
 
-        assertThat(chunks).isNotEmpty();
-        assertThat(chunks.get(0).length()).isLessThanOrEqualTo(512);
+        // LangChain4j RecursiveCharacterTextSplitter should produce multiple chunks
+        // when text exceeds chunkSize
+        assertThat(chunks.size()).isGreaterThan(1);
     }
 
     @Test
-    void chunkText_withChinesePeriod_splitsAtSentenceBoundary() throws Exception {
+    void chunkText_multipleChunks_respectChunkSize() throws Exception {
         var method = DocumentService.class.getDeclaredMethod("chunkText", String.class);
         method.setAccessible(true);
 
-        String text = "第一句内容。第二句内容。第三句内容。";
-        List<String> chunks = (List<String>) method.invoke(documentService, text);
+        // With chunkSize=512 and overlap=128, no single chunk should exceed 512 chars
+        @SuppressWarnings("unchecked")
+        List<String> chunks = (List<String>) method.invoke(documentService,
+                "X".repeat(1000));
 
         assertThat(chunks).isNotEmpty();
         for (String chunk : chunks) {
-            assertThat(chunk).doesNotContain("。第一句");
+            assertThat(chunk.length()).isLessThanOrEqualTo(512);
         }
     }
 }

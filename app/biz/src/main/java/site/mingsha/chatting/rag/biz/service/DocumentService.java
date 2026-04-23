@@ -1,21 +1,27 @@
 package site.mingsha.chatting.rag.biz.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.langchain4j.data.document.Document;
+import dev.langchain4j.data.document.DocumentSplitter;
+import dev.langchain4j.data.document.splitter.DocumentSplitters;
+import dev.langchain4j.data.document.parser.apache.tika.ApacheTikaDocumentParser;
+import dev.langchain4j.data.segment.TextSegment;
 import lombok.extern.slf4j.Slf4j;
-import site.mingsha.chatting.rag.integration.client.ChromaClient;
-import site.mingsha.chatting.rag.biz.service.EmbeddingService;
-import site.mingsha.chatting.rag.integration.config.RagProperties;
-import site.mingsha.chatting.rag.biz.model.dto.DocumentResponseDTO;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import site.mingsha.chatting.rag.biz.model.dto.DocumentResponseDTO;
+import site.mingsha.chatting.rag.integration.client.ChromaClient;
+import site.mingsha.chatting.rag.integration.config.RagProperties;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -25,27 +31,44 @@ import java.util.UUID;
  * <p>Handles the document ingestion pipeline:</p>
  * <ol>
  *   <li>Persists the uploaded file to local storage</li>
- *   <li>Reads and splits the content into overlapping chunks</li>
- *   <li>Generates embeddings for each chunk via {@link EmbeddingClient}</li>
+ *   <li>Parses content using LangChain4j TikaDocumentParser (PDF/Word) or direct read (text files)</li>
+ *   <li>Splits content into overlapping chunks using LangChain4j DocumentSplitters</li>
+ *   <li>Generates embeddings for each chunk via {@link EmbeddingService}</li>
  *   <li>Stores chunks and embeddings in ChromaDB via {@link ChromaClient}</li>
  * </ol>
  *
  * @see ChromaClient
- * @see EmbeddingClient
+ * @see EmbeddingService
  */
 @Slf4j
 @Service
 public class DocumentService {
 
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
-    private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
-            ".txt", ".pdf", ".doc", ".docx", ".md", ".csv", ".html", ".json", ".xml"
+
+    /**
+     * Text-based formats: read directly as string.
+     */
+    private static final Set<String> TEXT_EXTENSIONS = Set.of(
+            ".txt", ".md", ".csv", ".json", ".xml", ".html", ".htm"
     );
-    private static final Set<String> ALLOWED_MIME_TYPES = Set.of(
+
+    /**
+     * Binary formats: parsed via LangChain4j ApacheTikaDocumentParser.
+     */
+    private static final Set<String> BINARY_EXTENSIONS = Set.of(
+            ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"
+    );
+
+    private static final Set<String> ALL_EXTENSIONS = Set.copyOf(
+            new java.util.HashSet<>() {{
+                addAll(TEXT_EXTENSIONS);
+                addAll(BINARY_EXTENSIONS);
+            }}
+    );
+
+    private static final Set<String> TEXT_MIME_TYPES = Set.of(
             "text/plain",
-            "application/pdf",
-            "application/msword",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "text/markdown",
             "text/csv",
             "text/html",
@@ -53,8 +76,27 @@ public class DocumentService {
             "application/xml",
             "text/xml"
     );
+
+    private static final Set<String> BINARY_MIME_TYPES = Set.of(
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-powerpoint",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    );
+
+    private static final Set<String> ALL_MIME_TYPES = Set.copyOf(
+            new java.util.HashSet<>() {{
+                addAll(TEXT_MIME_TYPES);
+                addAll(BINARY_MIME_TYPES);
+            }}
+    );
+
     private final ChromaClient chromaClient;
     private final EmbeddingService embeddingService;
+    private final ApacheTikaDocumentParser tikaParser;
     private final Path uploadDir;
     private final ObjectMapper objectMapper;
     private final int chunkSize;
@@ -63,11 +105,11 @@ public class DocumentService {
     /**
      * Constructs the document service with required dependencies and configuration.
      *
-     * @param uploadDirPath       local directory path for storing uploaded files
-     * @param embeddingService    embedding service
-     * @param chromaClient        ChromaDB client
-     * @param objectMapper        Jackson ObjectMapper for metadata serialization
-     * @param ragProperties       RAG configuration containing chunk size/overlap settings
+     * @param uploadDirPath     local directory path for storing uploaded files
+     * @param embeddingService embedding service
+     * @param chromaClient     ChromaDB client
+     * @param objectMapper     Jackson ObjectMapper for metadata serialization
+     * @param ragProperties    RAG config (chunk size/overlap from rag.chunk.*)
      * @throws IOException if the upload directory cannot be created
      */
     public DocumentService(
@@ -81,53 +123,45 @@ public class DocumentService {
         this.chromaClient = chromaClient;
         this.objectMapper = objectMapper;
         this.uploadDir = Paths.get(uploadDirPath);
-        Files.createDirectories(uploadDir);
         this.chunkSize = ragProperties.chunk().size();
         this.chunkOverlap = ragProperties.chunk().overlap();
-        log.info("[Document] 初始化完成，uploadDir={}, chunkSize={}, chunkOverlap={}",
+        this.tikaParser = new ApacheTikaDocumentParser();
+        Files.createDirectories(uploadDir);
+        log.info("[Document] 初始化完成，uploadDir={}, chunkSize={}, chunkOverlap={}, 使用LangChain4j Tika解析器",
                 uploadDirPath, chunkSize, chunkOverlap);
     }
 
     /**
-     * Uploads a file, indexes it into ChromaDB, and returns the document metadata.
-     *
-     * <p>The file content is read, split into overlapping chunks, embedded,
-     * and stored in the vector database with metadata tracking document ID
-     * and chunk index.</p>
+     * Uploads a file, parses it, indexes it into ChromaDB, and returns the document metadata.
      *
      * @param file the uploaded multipart file
      * @return a {@link DocumentResponseDTO} with the assigned document ID and status
      * @throws IOException if file I/O operations fail
      */
     public DocumentResponseDTO uploadAndIndex(MultipartFile file) throws IOException {
-        // File size validation
         if (file.getSize() > MAX_FILE_SIZE) {
             throw new IllegalArgumentException(
                     "File size exceeds the maximum allowed size of 10 MB: " + file.getOriginalFilename());
         }
 
-        // File extension validation
         String filename = file.getOriginalFilename();
         if (filename == null || filename.isBlank()) {
             throw new IllegalArgumentException("File name is empty or not provided.");
         }
-        String lowerName = filename.toLowerCase(java.util.Locale.ROOT);
-        boolean hasAllowedExtension = ALLOWED_EXTENSIONS.stream()
-                .anyMatch(lowerName::endsWith);
+        String lowerName = filename.toLowerCase(Locale.ROOT);
+        boolean hasAllowedExtension = ALL_EXTENSIONS.stream().anyMatch(lowerName::endsWith);
         if (!hasAllowedExtension) {
             throw new IllegalArgumentException(
-                    "File type not supported. Allowed extensions: " + ALLOWED_EXTENSIONS);
+                    "File type not supported. Allowed extensions: " + ALL_EXTENSIONS);
         }
 
-        // MIME type validation
         String contentType = file.getContentType();
-        if (contentType == null || !ALLOWED_MIME_TYPES.contains(contentType)) {
+        if (contentType == null || !ALL_MIME_TYPES.contains(contentType)) {
             throw new IllegalArgumentException(
-                    "MIME type not supported: " + contentType + ". Allowed types: " + ALLOWED_MIME_TYPES);
+                    "MIME type not supported: " + contentType + ". Allowed types: " + ALL_MIME_TYPES);
         }
 
         String docId = UUID.randomUUID().toString();
-        // Sanitize filename: use docId + UUID with original extension (prevents path traversal)
         String ext = "";
         int dotIdx = filename.lastIndexOf('.');
         if (dotIdx > 0) {
@@ -139,9 +173,8 @@ public class DocumentService {
 
         Files.write(filePath, file.getBytes());
 
-        String content = Files.readString(filePath);
-
-        log.debug("[Document] 文件读取完成，filename={}, 内容长度={}", filename, content.length());
+        String content = parseContent(filePath, lowerName);
+        log.debug("[Document] 文件解析完成，filename={}, 内容长度={}", filename, content.length());
 
         List<String> chunks = chunkText(content);
         log.debug("[Document] 切片完成，filename={}, 片段数={}", filename, chunks.size());
@@ -174,9 +207,6 @@ public class DocumentService {
     /**
      * Deletes a document and all its associated vector entries from ChromaDB.
      *
-     * <p>Removes only the chunks that belong to the specified document by filtering
-     * on the {@code doc_id} metadata field.</p>
-     *
      * @param docId the unique document identifier
      */
     public void deleteDocument(String docId) {
@@ -185,40 +215,43 @@ public class DocumentService {
     }
 
     /**
-     * Splits text into overlapping chunks of configured size.
+     * Parses file content using the appropriate parser.
+     * Text files are read directly; binary files are parsed via LangChain4j TikaDocumentParser.
+     */
+    private String parseContent(Path filePath, String lowerName) throws IOException {
+        if (TEXT_EXTENSIONS.stream().anyMatch(lowerName::endsWith)) {
+            log.debug("[Document] 使用直接读取解析文本文件: {}", filePath);
+            return Files.readString(filePath);
+        }
+        if (BINARY_EXTENSIONS.stream().anyMatch(lowerName::endsWith)) {
+            log.debug("[Document] 使用LangChain4j TikaDocumentParser解析二进制文件: {}", filePath);
+            try (var is = Files.newInputStream(filePath)) {
+                Document document = tikaParser.parse(is);
+                return document.text();
+            }
+        }
+        // Fallback: try as text
+        return Files.readString(filePath);
+    }
+
+    /**
+     * Splits text into overlapping chunks using LangChain4j DocumentSplitters.
      *
-     * <p>Attempts to break at natural sentence boundaries (newline or full-width
-     * Chinese period) to keep chunks semantically coherent. Overlapping windows
-     * are used to preserve context across chunk boundaries.</p>
+     * <p>Uses {@code RecursiveCharacterTextSplitter} which respects natural
+     * boundaries (newlines, sentences) for semantically coherent chunks.
+     * Overlapping windows preserve context across chunk boundaries.</p>
      *
      * @param text the full document content
      * @return a list of text chunks
      */
     private List<String> chunkText(String text) {
-        List<String> chunks = new ArrayList<>();
-        int start = 0;
+        Document document = Document.from(text);
+        DocumentSplitter splitter = DocumentSplitters.recursive(chunkSize, chunkOverlap);
+        List<TextSegment> segments = splitter.split(document);
 
-        while (start < text.length()) {
-            int end = Math.min(start + chunkSize, text.length());
-
-            if (end < text.length()) {
-                int lastSeparator = Math.max(
-                        text.lastIndexOf('\n', end),
-                        text.lastIndexOf('。', end)
-                );
-                if (lastSeparator > start + chunkSize / 2) {
-                    end = lastSeparator + 1;
-                }
-            }
-
-            chunks.add(text.substring(start, end));
-            start = end - chunkOverlap;
-            int prevLen = chunks.isEmpty() ? 0 : chunks.get(chunks.size() - 1).length();
-            if (start <= prevLen - chunkOverlap) {
-                break;
-            }
-        }
-
-        return chunks;
+        log.debug("[Document] LangChain4j 智能分块完成，片段数={}", segments.size());
+        return segments.stream()
+                .map(TextSegment::text)
+                .toList();
     }
 }
