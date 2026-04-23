@@ -1,29 +1,17 @@
+export interface Reference {
+  content: string;
+  score: number;
+  metadata?: Record<string, unknown>;
+}
+
 export interface ChatMessage {
+  id?: string | number;
   role: 'user' | 'assistant' | 'system';
   content: string;
-  id?: number;
-  references?: Reference[];
   model?: string;
   contextUsed?: number;
   contextLimit?: number;
+  references?: Reference[];
   streaming?: boolean;
-}
-
-export interface Reference {
-  content: string;
-  documentId: string;
-  score: number;
-}
-
-export interface ChatMeta {
-  model: string;
-  contextUsed: number;
-  contextLimit: number;
-}
-
-export interface DocumentResponse {
-  id: string;
-  filename: string;
-  size: number;
-  status: string;
+  error?: boolean;
 }

@@ -1,185 +1,191 @@
 import { create } from 'zustand';
-import type { ChatMessage, Reference } from '@/types/chat';
-import { streamChat } from '@/services/chatService';
 
-interface ChatState {
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+
+export interface ChatMessage {
+  id?: string | number;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  model?: string;
+  contextUsed?: number;
+  contextLimit?: number;
+  references?: Array<{
+    content: string;
+    score: number;
+    metadata?: Record<string, unknown>;
+  }>;
+  streaming?: boolean;
+  error?: boolean;
+}
+
+interface ChatStore {
   messages: ChatMessage[];
   isLoading: boolean;
   isUploading: boolean;
-  uploadProgress: number;
-  currentAssistantId: number | null;
-  currentModel: string;
-  currentContextUsed: number;
-  currentContextLimit: number;
-  error: string | null;
-}
 
-interface ChatActions {
   sendMessage: (content: string) => Promise<void>;
   uploadDocument: (file: File) => Promise<void>;
   clearMessages: () => void;
-  clearError: () => void;
 }
 
-type ChatStore = ChatState & ChatActions;
-
 export const useChatStore = create<ChatStore>((set, get) => ({
-  // State
   messages: [],
   isLoading: false,
   isUploading: false,
-  uploadProgress: 0,
-  currentAssistantId: null,
-  currentModel: '',
-  currentContextUsed: 0,
-  currentContextLimit: 32000,
-  error: null,
 
-  // Actions
   sendMessage: async (content: string) => {
-    if (!content.trim() || get().isLoading) return;
+    if (get().isLoading) return;
 
-    const userMsg: ChatMessage = { role: 'user', content: content.trim() };
     const assistantId = Date.now();
+    const userMsg: ChatMessage = { id: `user-${Date.now()}`, role: 'user', content };
 
-    set((state) => ({
+    set(state => ({
       messages: [
         ...state.messages,
         userMsg,
-        { role: 'assistant', id: assistantId, content: '', references: [], streaming: true },
+        {
+          id: assistantId,
+          role: 'assistant',
+          content: '',
+          references: [],
+          streaming: true,
+          model: '',
+          contextUsed: 0,
+          contextLimit: 32000,
+        },
       ],
       isLoading: true,
-      error: null,
-      currentAssistantId: assistantId,
-      currentModel: '',
-      currentContextUsed: 0,
     }));
 
-    let answer = '';
-    let references: Reference[] = [];
-
     try {
-      const controller = new AbortController();
+      const resp = await fetch(`${API_BASE}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: content }),
+      });
 
-      for await (const event of streamChat(content.trim(), controller.signal)) {
-        if (event.type === 'chunk' && event.content !== undefined) {
-          answer += event.content;
-          set((state) => ({
-            messages: state.messages.map((msg) =>
-              msg.id === assistantId
-                ? { ...msg, content: answer, contextUsed: state.currentContextUsed }
-                : msg
-            ),
-          }));
-        } else if (event.type === 'references' && event.references !== undefined) {
-          references = event.references as Reference[];
-          set((state) => ({
-            messages: state.messages.map((msg) =>
-              msg.id === assistantId ? { ...msg, references } : msg
-            ),
-          }));
-        } else if (event.type === 'meta' && event.meta !== undefined) {
-          set((state) => ({
-            currentModel: event.meta!.model,
-            currentContextUsed: event.meta!.contextUsed,
-            currentContextLimit: event.meta!.contextLimit,
-            messages: state.messages.map((msg) =>
-              msg.id === assistantId
-                ? {
-                    ...msg,
-                    model: event.meta!.model,
-                    contextUsed: event.meta!.contextUsed,
-                    contextLimit: event.meta!.contextLimit,
-                  }
-                : msg
-            ),
-          }));
-        } else if (event.type === 'error') {
-          set({ error: event.error || '未知错误' });
-          break;
+      if (!resp.ok) throw new Error('请求失败: ' + resp.status);
+
+      const reader = resp.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let references: ChatMessage['references'] = [];
+      let answer = '';
+      let currentEvent: string | null = null;
+      let model = '';
+      let contextUsed = 0;
+      let contextLimit = 32000;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const raw of lines) {
+          const line = raw.trim();
+          if (!line) continue;
+
+          if (line.startsWith('event:')) {
+            currentEvent = line.slice(6).trim();
+            continue;
+          }
+
+          if (line.startsWith('data:')) {
+            const data = line.slice(5).trim();
+            if (!data) continue;
+
+            if (currentEvent === 'references') {
+              try {
+                references = JSON.parse(data);
+              } catch {
+                // ignore parse errors
+              }
+            } else if (currentEvent === 'meta') {
+              try {
+                const m = JSON.parse(data);
+                model = m.model || model;
+                contextUsed = m.contextUsed || 0;
+                contextLimit = m.contextLimit || 32000;
+              } catch {
+                // ignore parse errors
+              }
+            } else if (currentEvent !== 'done') {
+              // plain text chunk (MiniMax streaming)
+              answer += data;
+              contextUsed = Math.floor(answer.length / 4);
+              set(state => ({
+                messages: state.messages.map(msg =>
+                  msg.id === assistantId
+                    ? { ...msg, content: answer, model, contextUsed, contextLimit }
+                    : msg
+                ),
+              }));
+            }
+            currentEvent = null;
+          }
         }
       }
 
-      // Finalize message
-      set((state) => ({
-        messages: state.messages.map((msg) =>
+      set(state => ({
+        messages: state.messages.map(msg =>
           msg.id === assistantId
-            ? {
-                ...msg,
-                content: answer,
-                references,
-                streaming: false,
-                model: state.currentModel,
-                contextUsed: state.currentContextUsed,
-                contextLimit: state.currentContextLimit,
-              }
+            ? { ...msg, content: answer, references, streaming: false, model, contextUsed, contextLimit }
             : msg
         ),
+        isLoading: false,
       }));
     } catch (err) {
-      set({
-        error: err instanceof Error ? err.message : '请求失败',
-        messages: get().messages.map((msg) =>
+      set(state => ({
+        messages: state.messages.map(msg =>
           msg.id === assistantId
-            ? {
-                ...msg,
-                content: `抱歉，请求失败了：${err instanceof Error ? err.message : '未知错误'}`,
-                streaming: false,
-              }
+            ? { ...msg, content: '抱歉，请求失败了：' + (err as Error).message, streaming: false, error: true }
             : msg
         ),
-      });
-    } finally {
-      set({ isLoading: false, currentAssistantId: null });
+        isLoading: false,
+      }));
     }
   },
 
   uploadDocument: async (file: File) => {
     if (get().isUploading) return;
+    set({ isUploading: true });
 
-    set({ isUploading: true, uploadProgress: 0, error: null });
-
-    // Optimistically add system message
-    const systemMsg: ChatMessage = { role: 'system', content: `文档「${file.name}」上传中...` };
-    set((state) => ({ messages: [...state.messages, systemMsg] }));
+    const formData = new FormData();
+    formData.append('file', file);
 
     try {
-      const { uploadDocument } = await import('@/services/documentService');
-      const result = await uploadDocument(file, (percent) => {
-        set({ uploadProgress: percent });
-      });
+      const res = await fetch(`${API_BASE}/documents`, { method: 'POST', body: formData });
+      if (!res.ok) throw new Error('上传失败');
+      const data = await res.json();
 
-      set((state) => ({
-        messages: state.messages.map((msg) =>
-          msg.role === 'system' && msg.content.includes(file.name)
-            ? { role: 'system', content: `文档「${result.filename}」上传成功，已索引 ${result.status}` }
-            : msg
-        ),
-        isUploading: false,
-        uploadProgress: 0,
+      set(state => ({
+        messages: [
+          ...state.messages,
+          {
+            id: `system-${Date.now()}`,
+            role: 'system',
+            content: `文档「${data.filename}」上传成功，已索引 ${data.status}`,
+          },
+        ],
       }));
     } catch (err) {
-      set({
-        error: err instanceof Error ? err.message : '上传失败',
-        isUploading: false,
-        uploadProgress: 0,
-        messages: get().messages.map((msg) =>
-          msg.role === 'system' && msg.content.includes(file.name)
-            ? { role: 'system', content: `文档上传失败：${err instanceof Error ? err.message : '未知错误'}` }
-            : msg
-        ),
-      });
+      set(state => ({
+        messages: [
+          ...state.messages,
+          {
+            id: `system-${Date.now()}`,
+            role: 'system',
+            content: '文档上传失败：' + (err as Error).message,
+          },
+        ],
+      }));
+    } finally {
+      set({ isUploading: false });
     }
   },
 
-  clearMessages: () => {
-    set({
-      messages: [],
-      error: null,
-      currentModel: '',
-      currentContextUsed: 0,
-    });
-  },
-
-  clearError: () => set({ error: null }),
+  clearMessages: () => set({ messages: [] }),
 }));
