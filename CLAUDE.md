@@ -152,7 +152,8 @@ If you're developing a feature and a critical bug is reported:
 
 ```bash
 # Stash current work (don't commit half-done changes)
-git stash
+# Note: git stash is repository-wide, not worktree-specific
+git stash push -m "feature/xxx work in progress"
 
 # Create a hotfix worktree
 git worktree add .claude/worktrees/hotfix/urgent-bug -b hotfix/urgent-bug
@@ -183,6 +184,39 @@ git rebase --continue
 
 ---
 
+### Workflow: Resolve Merge Conflicts
+
+If `git rebase` pauses due to conflicts:
+
+```bash
+cd .claude/worktrees/feature/xxx
+git rebase origin/main
+
+# Git marks conflicts like this:
+# <<<<<<< HEAD
+# 你的更改
+# =======
+# origin/main 的更改
+# >>>>>>> <commit-hash>
+```
+
+Resolve each conflicted file, then:
+
+```bash
+git add .
+git rebase --continue
+```
+
+> **Do NOT use `git rebase --skip`** — it discards commits from `main`.
+
+To abort and give up:
+
+```bash
+git rebase --abort
+```
+
+---
+
 ## Build & Run Commands
 
 ```bash
@@ -202,7 +236,7 @@ make docker.run ENV=dev                # build + run container
 make docker.stop ENV=dev              # stop container
 
 # Helm (Kubernetes)
-make helm.upgrade ENV=test             # build, push, and deploy to k8s
+make helm.upgrade ENV=dev             # build, push, and deploy to k8s
 
 # Frontend (run from ui/ directory)
 cd ui && make install                  # install dependencies
@@ -210,19 +244,20 @@ cd ui && make run                      # dev server (port 8000)
 cd ui && make package ENV=dev          # build dev artifact
 ```
 
-**Profiles**: `local`, `dev`, `test`, `prod` — selected via `-P` flag or `ENV=` in Makefile. Each profile has its own config under `config/<profile>/`.
+**Profiles**: `local`, `dev` — selected via `ENV=` in Makefile. `local` for local dev, `dev` for k8s deployment. Each profile has its own config under `config/<profile>/`.
 
 ---
 
 ## Architecture
 
 ```
-boot/             → Spring Boot entry point (site.mingsha.chatting.rag)
-app/web/          → REST controllers (ChatController /api/chat, DocumentController /api/documents)
-app/biz/          → Business logic (RAGService, DocumentService, ChromaService)
-app/integration/   → External clients (LlmClient, ChromaClient, EmbeddingClient)
-app/test/         → Unit tests
-ui/               → React frontend (Vite, separate from Spring)
+boot/               → Spring Boot entry point (site.mingsha.chatting.rag)
+app/web/            → REST controllers (ChatController /api/chat, DocumentController /api/documents)
+app/biz/            → Business logic (RAGService, DocumentService, ChromaService)
+app/integration/    → External clients (LlmClient, ChromaClient, EmbeddingClient)
+app/test/           → Unit tests
+assembly/           → Maven assembly packaging, produces tar.gz release bundle
+ui/                 → React frontend (Vite, separate from Spring)
 ```
 
 **Dependency chain**: `boot` → `web` → `biz` → `integration`
