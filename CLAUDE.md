@@ -254,7 +254,8 @@ cd ui && make package ENV=dev          # build dev artifact
 boot/               → Spring Boot entry point (site.mingsha.chatting.rag)
 app/web/            → REST controllers (ChatController /api/chat, DocumentController /api/documents)
 app/biz/            → Business logic (RAGService, DocumentService, ChromaService)
-app/integration/    → External clients (LlmClient, ChromaClient, EmbeddingClient)
+                     └── langchain4j/ → LangChain4j RAG (ChatMemoryService: conversation memory)
+app/integration/    → External clients (SpringAiLlmClient, SpringAiEmbeddingClient, ChromaClient)
 app/test/           → Unit tests
 assembly/           → Maven assembly packaging, produces tar.gz release bundle
 ui/                 → React frontend (Vite, separate from Spring)
@@ -262,7 +263,11 @@ ui/                 → React frontend (Vite, separate from Spring)
 
 **Dependency chain**: `boot` → `web` → `biz` → `integration`
 
-**RAG flow**: User query → embed → ChromaDB similarity search → build prompt with top-K chunks → LLM streaming response (SSE).
+**RAG flow**: User query → embed → ChromaDB similarity search → build prompt with top-K chunks + conversation memory → LLM streaming response (SSE).
+
+**AI stack**:
+- Spring AI 1.0.0-M6 → LLM calls (MiniMax OpenAI-compatible) + Embedding calls (Ollama)
+- LangChain4j 1.0.0 → Conversation memory (MessageWindowChatMemory) + Document parsing (Apache Tika) + Smart chunking (RecursiveCharacterTextSplitter)
 
 ---
 

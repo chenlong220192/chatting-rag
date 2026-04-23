@@ -10,11 +10,10 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import site.mingsha.chatting.rag.integration.client.ChromaClient;
-import site.mingsha.chatting.rag.integration.client.EmbeddingClient;
-import site.mingsha.chatting.rag.integration.client.LlmClient;
-import site.mingsha.chatting.rag.integration.config.LlmProperties;
 import site.mingsha.chatting.rag.integration.config.RagProperties;
 import site.mingsha.chatting.rag.integration.model.vo.ChromaSearchResultVO;
+import site.mingsha.chatting.rag.biz.service.EmbeddingService;
+import site.mingsha.chatting.rag.biz.service.LlmService;
 import site.mingsha.chatting.rag.biz.service.RAGService;
 
 import java.util.List;
@@ -29,15 +28,13 @@ import static org.mockito.Mockito.*;
 class RAGServiceTests {
 
     @Mock
-    private EmbeddingClient embeddingClient;
+    private EmbeddingService embeddingService;
     @Mock
-    private LlmClient llmClient;
+    private LlmService llmService;
     @Mock
     private ChromaClient chromaClient;
     @Mock
     private RagProperties ragProperties;
-    @Mock
-    private LlmProperties llmProperties;
     @Mock
     private RagProperties.ChunkConfig chunkConfig;
 
@@ -50,12 +47,12 @@ class RAGServiceTests {
         when(ragProperties.chunk()).thenReturn(chunkConfig);
         when(chunkConfig.size()).thenReturn(512);
         when(chunkConfig.overlap()).thenReturn(128);
-        when(llmProperties.model()).thenReturn("gpt-4o");
-        when(llmProperties.contextLimit()).thenReturn(128000);
 
         ragService = new RAGService(
-                embeddingClient, llmClient, chromaClient,
-                ragProperties, llmProperties,
+                embeddingService, llmService, chromaClient,
+                ragProperties,
+                "gpt-4o",
+                128000,
                 "参考文档：%s\n\n请根据以上文档回答用户的问题。"
         );
     }
@@ -67,24 +64,24 @@ class RAGServiceTests {
         ChromaSearchResultVO result = new ChromaSearchResultVO(
                 "chunk1", "Some document content", 0.1, 0.95, meta
         );
-        when(embeddingClient.embed(anyString())).thenReturn(new float[]{0.1f, 0.2f});
+        when(embeddingService.embed(anyString())).thenReturn(new float[]{0.1f, 0.2f});
         when(chromaClient.query(any(float[].class), eq(5))).thenReturn(List.of(result));
-        when(llmClient.chat(anyString(), eq("Hello"))).thenReturn("This is the answer.");
+        when(llmService.chat(anyString(), eq("Hello"))).thenReturn("This is the answer.");
 
         var response = ragService.chat("Hello");
 
         assertThat(response.answer()).isEqualTo("This is the answer.");
         assertThat(response.references()).hasSize(1);
         assertThat(response.references().get(0).score()).isEqualTo(0.95);
-        verify(llmClient).chat(anyString(), eq("Hello"));
+        verify(llmService).chat(anyString(), eq("Hello"));
     }
 
     @Test
     @DisplayName("chat no references uses fallback prompt")
     void chat_noReferences_usesFallbackPrompt() {
-        when(embeddingClient.embed(anyString())).thenReturn(new float[]{0.1f, 0.2f});
+        when(embeddingService.embed(anyString())).thenReturn(new float[]{0.1f, 0.2f});
         when(chromaClient.query(any(float[].class), eq(5))).thenReturn(List.of());
-        when(llmClient.chat(eq("你是一个助手。没有可用的参考文档，请直接回答用户的问题。"), eq("Hello")))
+        when(llmService.chat(eq("你是一个助手。没有可用的参考文档，请直接回答用户的问题。"), eq("Hello")))
                 .thenReturn("Fallback answer.");
 
         var response = ragService.chat("Hello");
@@ -100,9 +97,9 @@ class RAGServiceTests {
         ChromaSearchResultVO belowThreshold = new ChromaSearchResultVO(
                 "chunk1", "Low relevance", 0.9, 0.1, meta
         );
-        when(embeddingClient.embed(anyString())).thenReturn(new float[]{0.1f});
+        when(embeddingService.embed(anyString())).thenReturn(new float[]{0.1f});
         when(chromaClient.query(any(float[].class), eq(5))).thenReturn(List.of(belowThreshold));
-        when(llmClient.chat(anyString(), anyString())).thenReturn("Fallback answer.");
+        when(llmService.chat(anyString(), anyString())).thenReturn("Fallback answer.");
 
         var response = ragService.chat("Hello");
 
@@ -116,7 +113,7 @@ class RAGServiceTests {
         com.fasterxml.jackson.databind.node.ObjectNode meta = new ObjectMapper().createObjectNode();
         ChromaSearchResultVO r1 = new ChromaSearchResultVO("id1", "content1", 0.1, 0.9, meta);
         ChromaSearchResultVO r2 = new ChromaSearchResultVO("id2", "content2", 0.2, 0.3, meta);
-        when(embeddingClient.embed(anyString())).thenReturn(new float[]{0.1f});
+        when(embeddingService.embed(anyString())).thenReturn(new float[]{0.1f});
         when(chromaClient.query(any(float[].class), eq(5))).thenReturn(List.of(r1, r2));
 
         var refs = ragService.getReferences("Hello");
@@ -128,7 +125,7 @@ class RAGServiceTests {
     @Test
     @DisplayName("getReferences empty result returns empty list")
     void getReferences_emptyResult_returnsEmptyList() {
-        when(embeddingClient.embed(anyString())).thenReturn(new float[]{0.1f});
+        when(embeddingService.embed(anyString())).thenReturn(new float[]{0.1f});
         when(chromaClient.query(any(float[].class), eq(5))).thenReturn(List.of());
 
         var refs = ragService.getReferences("Hello");
@@ -141,7 +138,7 @@ class RAGServiceTests {
     void buildSystemPrompt_withContext_injectsContext() {
         com.fasterxml.jackson.databind.node.ObjectNode meta = new ObjectMapper().createObjectNode();
         ChromaSearchResultVO result = new ChromaSearchResultVO("id1", "Doc content", 0.1, 0.9, meta);
-        when(embeddingClient.embed(anyString())).thenReturn(new float[]{0.1f});
+        when(embeddingService.embed(anyString())).thenReturn(new float[]{0.1f});
         when(chromaClient.query(any(float[].class), eq(5))).thenReturn(List.of(result));
 
         String prompt = ragService.buildSystemPrompt("Hello");
@@ -153,7 +150,7 @@ class RAGServiceTests {
     @Test
     @DisplayName("buildSystemPrompt empty returns fallback")
     void buildSystemPrompt_empty_returnsFallback() {
-        when(embeddingClient.embed(anyString())).thenReturn(new float[]{0.1f});
+        when(embeddingService.embed(anyString())).thenReturn(new float[]{0.1f});
         when(chromaClient.query(any(float[].class), eq(5))).thenReturn(List.of());
 
         String prompt = ragService.buildSystemPrompt("Hello");
@@ -172,10 +169,10 @@ class RAGServiceTests {
     }
 
     @Test
-    @DisplayName("chatStream delegates to LlmClient")
-    void chatStream_delegatesToLlmClient() {
+    @DisplayName("chatStream delegates to LlmService")
+    void chatStream_delegatesToLlmService() {
         ragService.chatStream("system", "user", chunk -> {}, () -> {});
-        verify(llmClient).chatStreamWithDone(eq("system"), eq("user"), any(), any());
+        verify(llmService).chatStreamWithDone(eq("system"), eq("user"), any(), any());
     }
 
     @Test

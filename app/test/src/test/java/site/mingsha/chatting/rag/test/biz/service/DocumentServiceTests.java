@@ -11,8 +11,8 @@ import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.web.multipart.MultipartFile;
 import site.mingsha.chatting.rag.integration.client.ChromaClient;
-import site.mingsha.chatting.rag.integration.client.EmbeddingClient;
 import site.mingsha.chatting.rag.integration.config.RagProperties;
+import site.mingsha.chatting.rag.biz.service.EmbeddingService;
 import site.mingsha.chatting.rag.biz.service.DocumentService;
 import site.mingsha.chatting.rag.biz.model.dto.DocumentResponseDTO;
 
@@ -30,7 +30,7 @@ import static org.mockito.Mockito.*;
 class DocumentServiceTests {
 
     @Mock
-    private EmbeddingClient embeddingClient;
+    private EmbeddingService embeddingService;
     @Mock
     private ChromaClient chromaClient;
     @Mock
@@ -52,7 +52,7 @@ class DocumentServiceTests {
 
         documentService = new DocumentService(
                 tempDir.toString(),
-                embeddingClient,
+                embeddingService,
                 chromaClient,
                 objectMapper,
                 ragProperties
@@ -121,7 +121,7 @@ class DocumentServiceTests {
         when(file.getContentType()).thenReturn("text/plain");
         when(file.getSize()).thenReturn(100L);
         when(file.getBytes()).thenReturn("Hello world this is a test document".getBytes());
-        when(embeddingClient.embed(anyString())).thenReturn(new float[]{0.1f, 0.2f, 0.3f});
+        when(embeddingService.embed(anyString())).thenReturn(new float[]{0.1f, 0.2f, 0.3f});
 
         DocumentResponseDTO response = documentService.uploadAndIndex(file);
 
@@ -138,7 +138,7 @@ class DocumentServiceTests {
         when(file.getContentType()).thenReturn("text/plain");
         when(file.getSize()).thenReturn(100L);
         when(file.getBytes()).thenReturn("Content here".getBytes());
-        when(embeddingClient.embed(anyString())).thenReturn(new float[]{0.1f, 0.2f});
+        when(embeddingService.embed(anyString())).thenReturn(new float[]{0.1f, 0.2f});
 
         documentService.uploadAndIndex(file);
 
@@ -159,6 +159,7 @@ class DocumentServiceTests {
         var method = DocumentService.class.getDeclaredMethod("chunkText", String.class);
         method.setAccessible(true);
 
+        @SuppressWarnings("unchecked")
         List<String> chunks = (List<String>) method.invoke(documentService, "");
 
         assertThat(chunks).isEmpty();
@@ -170,6 +171,7 @@ class DocumentServiceTests {
         method.setAccessible(true);
 
         String shortText = "This is a short text.";
+        @SuppressWarnings("unchecked")
         List<String> chunks = (List<String>) method.invoke(documentService, shortText);
 
         assertThat(chunks).hasSize(1);
@@ -177,34 +179,36 @@ class DocumentServiceTests {
     }
 
     @Test
-    void chunkText_longText_returnsNonTrivialOutput() throws Exception {
+    void chunkText_longText_usesRecursiveSplitter() throws Exception {
         var method = DocumentService.class.getDeclaredMethod("chunkText", String.class);
         method.setAccessible(true);
 
-        // Build text that exceeds chunkSize (512) with newlines as separators
+        // Build text that clearly exceeds chunkSize (512 chars)
         StringBuilder sb = new StringBuilder();
-        // 15 sentences of ~35 chars each = ~525 chars total, exceeds 512
-        for (int i = 0; i < 15; i++) {
+        for (int i = 0; i < 20; i++) {
             sb.append("Sentence ").append(i).append(" content here.\n");
         }
+        @SuppressWarnings("unchecked")
         List<String> chunks = (List<String>) method.invoke(documentService, sb.toString());
 
-        // Should have at least 2 chunks (text exceeds 512 chars)
-        assertThat(chunks).isNotEmpty();
-        assertThat(chunks.get(0).length()).isLessThanOrEqualTo(512);
+        // LangChain4j RecursiveCharacterTextSplitter should produce multiple chunks
+        // when text exceeds chunkSize
+        assertThat(chunks.size()).isGreaterThan(1);
     }
 
     @Test
-    void chunkText_withChinesePeriod_splitsAtSentenceBoundary() throws Exception {
+    void chunkText_multipleChunks_respectChunkSize() throws Exception {
         var method = DocumentService.class.getDeclaredMethod("chunkText", String.class);
         method.setAccessible(true);
 
-        String text = "第一句内容。第二句内容。第三句内容。";
-        List<String> chunks = (List<String>) method.invoke(documentService, text);
+        // With chunkSize=512 and overlap=128, no single chunk should exceed 512 chars
+        @SuppressWarnings("unchecked")
+        List<String> chunks = (List<String>) method.invoke(documentService,
+                "X".repeat(1000));
 
         assertThat(chunks).isNotEmpty();
         for (String chunk : chunks) {
-            assertThat(chunk).doesNotContain("。第一句");
+            assertThat(chunk.length()).isLessThanOrEqualTo(512);
         }
     }
 }
