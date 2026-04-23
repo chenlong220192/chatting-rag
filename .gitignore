@@ -396,4 +396,4 @@ application-local.properties
 
 # AI agent
 .claude
-config/dev/application-llm.yml
+config/**/application-llm.yml
