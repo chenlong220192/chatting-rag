@@ -55,7 +55,7 @@ help: ## $(HELP) 显示帮助信息
 	@printf "\n"
 
 	@printf "${BOLD}${YELLOW}%-8s:${RESET}\n" "环境变量"
-	@printf "  ${GREEN}%-22s${RESET} %s\n" "ENV" "- 环境配置 (默认: local, 可选: dev, test, prod)"
+	@printf "  ${GREEN}%-22s${RESET} %s\n" "ENV" "- 环境配置 (默认: dev, 可选: local, dev)"
 	@printf "  ${GREEN}%-22s${RESET} %s\n" "SKIP_TEST" "- 跳过测试 (默认: false, 可选: true)"
 	@printf "\n"
 
@@ -69,7 +69,7 @@ help: ## $(HELP) 显示帮助信息
 	@printf "  ${GREEN}%-22s${RESET} %s\n" "make clean" "${CLEAN} 清理构建文件"
 	@printf "  ${GREEN}%-22s${RESET} %s\n" "make package ENV=dev" "${PACKAGE} 构建开发环境包"
 	@printf "  ${GREEN}%-22s${RESET} %s\n" "make docker.build ENV=prod" "${DOCKER} 构建生产环境Docker镜像"
-	@printf "  ${GREEN}%-22s${RESET} %s\n" "make helm.upgrade ENV=test" "${HELM} 部署到测试环境"
+	@printf "  ${GREEN}%-22s${RESET} %s\n" "make helm.upgrade ENV=dev" "${HELM} 部署到开发环境"
 	@printf "\n"
 	@printf "${BOLD}${CYAN}╔══════════════════════════════════════════════════════════════╗${RESET}\n"
 	@printf "${BOLD}${CYAN}║                    ${SUCCESS} 构建愉快！${SUCCESS}                              ║${RESET}\n"
@@ -172,7 +172,7 @@ docker.build: ## $(DOCKER) 构建Docker镜像
 	@printf "${GREEN}${DOCKER} Docker镜像构建完成！${RESET}\n"
 
 #
-docker.push: ## $(DOCKER) 构建Docker镜像
+docker.push: ## $(DOCKER) 推送Docker镜像
 	@printf "${BLUE}${DOCKER} 推送Docker镜像 (环境: ${ENV})...${RESET}\n"
 	sh ${BASE_PATH}/deploy/bin/docker/push.sh $(DOCKER_REPOSITORY_NAME) $(DOCKER_IMAGE_NAME) $(DOCKER_IMAGE_TAG) $(ENV)
 	@printf "${GREEN}${DOCKER} Docker镜像推送完成！${RESET}\n"
