@@ -2,7 +2,6 @@ package site.mingsha.chatting.rag.biz.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import site.mingsha.chatting.rag.integration.client.EmbeddingClient;
 import site.mingsha.chatting.rag.integration.client.SpringAiEmbeddingClient;
 
 /**

@@ -3,7 +3,7 @@ package site.mingsha.chatting.rag.biz.service;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import site.mingsha.chatting.rag.integration.client.ChromaClient;
-import site.mingsha.chatting.rag.integration.client.EmbeddingClient;
+import site.mingsha.chatting.rag.biz.service.EmbeddingService;
 import site.mingsha.chatting.rag.integration.config.RagProperties;
 import site.mingsha.chatting.rag.biz.model.dto.DocumentResponseDTO;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,7 +54,7 @@ public class DocumentService {
             "text/xml"
     );
     private final ChromaClient chromaClient;
-    private final EmbeddingClient embeddingClient;
+    private final EmbeddingService embeddingService;
     private final Path uploadDir;
     private final ObjectMapper objectMapper;
     private final int chunkSize;
@@ -64,7 +64,7 @@ public class DocumentService {
      * Constructs the document service with required dependencies and configuration.
      *
      * @param uploadDirPath       local directory path for storing uploaded files
-     * @param embeddingClient     embedding service client
+     * @param embeddingService    embedding service
      * @param chromaClient        ChromaDB client
      * @param objectMapper        Jackson ObjectMapper for metadata serialization
      * @param ragProperties       RAG configuration containing chunk size/overlap settings
@@ -72,12 +72,12 @@ public class DocumentService {
      */
     public DocumentService(
             @Value("${upload.dir}") String uploadDirPath,
-            EmbeddingClient embeddingClient,
+            EmbeddingService embeddingService,
             ChromaClient chromaClient,
             ObjectMapper objectMapper,
             RagProperties ragProperties
     ) throws IOException {
-        this.embeddingClient = embeddingClient;
+        this.embeddingService = embeddingService;
         this.chromaClient = chromaClient;
         this.objectMapper = objectMapper;
         this.uploadDir = Paths.get(uploadDirPath);
@@ -156,7 +156,7 @@ public class DocumentService {
 
             ids.add(docId + "_chunk_" + ids.size());
             texts.add(chunk);
-            embeddings.add(embeddingClient.embed(chunk));
+            embeddings.add(embeddingService.embed(chunk));
             metadatas.add(objectMapper.writeValueAsString(
                     java.util.Map.of("doc_id", docId, "filename", filename, "chunk_index", texts.size() - 1)
             ));

@@ -2,9 +2,6 @@ package site.mingsha.chatting.rag.biz.service;
 
 import lombok.extern.slf4j.Slf4j;
 import site.mingsha.chatting.rag.integration.client.ChromaClient;
-import site.mingsha.chatting.rag.integration.client.EmbeddingClient;
-import site.mingsha.chatting.rag.integration.client.LlmClient;
-import site.mingsha.chatting.rag.integration.config.LlmProperties;
 import site.mingsha.chatting.rag.integration.config.RagProperties;
 import site.mingsha.chatting.rag.biz.model.dto.ChatMetaDTO;
 import site.mingsha.chatting.rag.biz.model.dto.ChatResponseDTO;
@@ -22,54 +19,58 @@ import java.util.stream.Collectors;
  *
  * <p>Coordinates the end-to-end RAG pipeline:</p>
  * <ol>
- *   <li>Embeds the user's query using {@link EmbeddingClient}</li>
+ *   <li>Embeds the user's query using {@link EmbeddingService}</li>
  *   <li>Retrieves top-K similar document chunks from {@link ChromaClient}</li>
  *   <li>Filters results by minimum similarity score</li>
  *   <li>Builds a system prompt with the retrieved context</li>
- *   <li>Delegates to {@link LlmClient} for answer generation</li>
+ *   <li>Delegates to {@link LlmService} for answer generation</li>
  * </ol>
  *
  * <p>This service exposes both blocking (for synchronous chat) and streaming
  * (for SSE-based) interfaces.</p>
  *
- * @see EmbeddingClient
+ * @see EmbeddingService
  * @see ChromaClient
- * @see LlmClient
+ * @see LlmService
  */
 @Slf4j
 @Service
 public class RAGService {
 
-    private final EmbeddingClient embeddingClient;
-    private final LlmClient llmClient;
+    private final EmbeddingService embeddingService;
+    private final LlmService llmService;
     private final ChromaClient chromaClient;
     private final RagProperties ragProperties;
-    private final LlmProperties llmProperties;
+    private final String llmModel;
+    private final int llmContextLimit;
     private final String systemPromptTemplate;
 
     /**
      * Constructs the RAG service with all required dependencies.
      *
-     * @param embeddingClient      embedding service client
-     * @param llmClient           LLM service client
-     * @param chromaClient         ChromaDB client
-     * @param ragProperties        RAG configuration (top-K, min-score, chunk params)
-     * @param llmProperties        LLM configuration (model, context-limit, etc.)
+     * @param embeddingService     embedding service
+     * @param llmService         LLM service
+     * @param chromaClient        ChromaDB client
+     * @param ragProperties       RAG configuration (top-K, min-score, chunk params)
+     * @param llmModel            LLM model name
+     * @param llmContextLimit     LLM context window limit (tokens)
      * @param systemPromptTemplate system prompt template with a {@code %s} placeholder for context
      */
     public RAGService(
-            EmbeddingClient embeddingClient,
-            LlmClient llmClient,
+            EmbeddingService embeddingService,
+            LlmService llmService,
             ChromaClient chromaClient,
             RagProperties ragProperties,
-            LlmProperties llmProperties,
+            @Value("${llm.model}") String llmModel,
+            @Value("${llm.context-limit}") int llmContextLimit,
             @Value("${prompt.template}") String systemPromptTemplate
     ) {
-        this.embeddingClient = embeddingClient;
-        this.llmClient = llmClient;
+        this.embeddingService = embeddingService;
+        this.llmService = llmService;
         this.chromaClient = chromaClient;
         this.ragProperties = ragProperties;
-        this.llmProperties = llmProperties;
+        this.llmModel = llmModel;
+        this.llmContextLimit = llmContextLimit;
         this.systemPromptTemplate = systemPromptTemplate;
         log.info("[RAG] 初始化完成，topK={}, minScore={}, chunkSize={}, chunkOverlap={}",
                 ragProperties.topK(), ragProperties.minScore(),
@@ -91,7 +92,7 @@ public class RAGService {
         log.info("[RAG] 用户问题: [{}]", userMessage);
 
         log.info("[RAG] Step 1: 向量化用户问题...");
-        float[] queryEmbedding = embeddingClient.embed(userMessage);
+        float[] queryEmbedding = embeddingService.embed(userMessage);
         log.debug("[RAG] 问题向量维度: {}", queryEmbedding.length);
 
         log.info("[RAG] Step 2: ChromaDB 向量检索，topK={}", ragProperties.topK());
@@ -117,8 +118,8 @@ public class RAGService {
             log.debug("[RAG] 完整 system prompt:\n{}", systemPrompt);
         }
 
-        log.info("[RAG] Step 5: 调用 LLM，model={}", llmProperties.model());
-        String answer = llmClient.chat(systemPrompt, userMessage);
+        log.info("[RAG] Step 5: 调用 LLM，model={}", llmModel);
+        String answer = llmService.chat(systemPrompt, userMessage);
         log.info("[RAG] LLM 回复长度={}", answer.length());
         log.debug("[RAG] LLM 回复预览: [{}]",
                 answer.length() > 150 ? answer.substring(0, 150) + "..." : answer);
@@ -151,7 +152,7 @@ public class RAGService {
     public List<Reference> getReferences(String userMessage) {
         log.info("[RAG] 获取引用，userMessage=[{}]", userMessage);
 
-        float[] queryEmbedding = embeddingClient.embed(userMessage);
+        float[] queryEmbedding = embeddingService.embed(userMessage);
         List<ChromaSearchResultVO> searchResults =
                 chromaClient.query(queryEmbedding, ragProperties.topK());
 
@@ -187,7 +188,7 @@ public class RAGService {
     public String buildSystemPrompt(String userMessage) {
         log.info("[RAG] 构建 system prompt，userMessage=[{}]", userMessage);
 
-        float[] queryEmbedding = embeddingClient.embed(userMessage);
+        float[] queryEmbedding = embeddingService.embed(userMessage);
         List<ChromaSearchResultVO> searchResults =
                 chromaClient.query(queryEmbedding, ragProperties.topK());
 
@@ -223,8 +224,8 @@ public class RAGService {
     public ChatMetaDTO buildMeta(String systemPrompt, String userMessage) {
         int used = (systemPrompt.length() + userMessage.length()) / 4;
         log.debug("[RAG] 构建 meta，systemPrompt长度={}, userMessage长度={}, 估算token={}, contextLimit={}",
-                systemPrompt.length(), userMessage.length(), used, llmProperties.contextLimit());
-        return new ChatMetaDTO(llmProperties.model(), used, llmProperties.contextLimit());
+                systemPrompt.length(), userMessage.length(), used, llmContextLimit);
+        return new ChatMetaDTO(llmModel, used, llmContextLimit);
     }
 
     /**
@@ -242,7 +243,7 @@ public class RAGService {
                            Consumer<String> onChunk, Runnable onComplete) {
         log.info("[RAG] ========== 流式对话开始 ==========");
         log.info("[RAG] systemPrompt长度={}, userMessage=[{}]", systemPrompt.length(), userMessage);
-        llmClient.chatStreamWithDone(systemPrompt, userMessage, onChunk, onComplete);
+        llmService.chatStreamWithDone(systemPrompt, userMessage, onChunk, onComplete);
     }
 
     /**
