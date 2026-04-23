@@ -12,3 +12,11 @@ embedding:
   provider: ollama
   base-url: http://ollama.internal.local
   model: nomic-embed-text-v2-moe
+
+# ============================================================
+# Spring AI — Ollama
+# ============================================================
+spring:
+  ai:
+    ollama:
+      base-url: ${embedding.base-url:http://ollama.internal.local}

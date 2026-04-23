@@ -3,28 +3,29 @@ package site.mingsha.chatting.rag.biz.service;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import site.mingsha.chatting.rag.integration.client.EmbeddingClient;
+import site.mingsha.chatting.rag.integration.client.SpringAiEmbeddingClient;
 
 /**
  * Business-level service for text embedding operations.
  *
- * <p>Provides a thin facade over {@link EmbeddingClient}, exposing
+ * <p>Provides a thin facade over {@link SpringAiEmbeddingClient}, exposing
  * the single {@code embed(text)} operation used throughout the RAG pipeline.</p>
  *
- * @see EmbeddingClient
+ * @see SpringAiEmbeddingClient
  */
 @Slf4j
 @Service
 public class EmbeddingService {
 
-    private final EmbeddingClient embeddingClient;
+    private final SpringAiEmbeddingClient springAiEmbeddingClient;
 
     /**
-     * Constructs the service with the underlying embedding client.
+     * Constructs the service with the underlying Spring AI embedding client.
      *
-     * @param embeddingClient the embedding HTTP client
+     * @param springAiEmbeddingClient the Spring AI embedding client
      */
-    public EmbeddingService(EmbeddingClient embeddingClient) {
-        this.embeddingClient = embeddingClient;
+    public EmbeddingService(SpringAiEmbeddingClient springAiEmbeddingClient) {
+        this.springAiEmbeddingClient = springAiEmbeddingClient;
     }
 
     /**
@@ -34,6 +35,6 @@ public class EmbeddingService {
      * @return a float array representing the embedding vector
      */
     public float[] embed(String text) {
-        return embeddingClient.embed(text);
+        return springAiEmbeddingClient.embed(text);
     }
 }
